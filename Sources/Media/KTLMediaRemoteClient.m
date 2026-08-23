@@ -1,7 +1,7 @@
 #import "KTLMediaRemoteClient.h"
 #import "KTLNowPlaying.h"
 
-static NSString *const KTLErrorDomain = @"KugouTouchBarLyrics.MediaRemote";
+static NSString *const KTLErrorDomain = @"KugouLyricsx.MediaRemote";
 
 @interface KTLMediaRemoteClient ()
 @property(nonatomic, strong) NSURL *resourcesDirectory;
@@ -75,12 +75,41 @@ static NSString *const KTLErrorDomain = @"KugouTouchBarLyrics.MediaRemote";
 }
 
 - (KTLNowPlaying *)snapshotWithError:(NSError **)error {
-    NSData *data = [self runMediaControlArguments:@[@"get", @"--now", @"--no-artwork"] error:error];
-    if (!data) data = [self runScriptNamed:@"now-playing.js" arguments:@[] error:error];
-    if (!data || data.length == 0) return nil;
-    NSDictionary *dictionary = [NSJSONSerialization JSONObjectWithData:data options:0 error:error];
-    if (![dictionary isKindOfClass:NSDictionary.class]) return nil;
-    return [KTLNowPlaying nowPlayingFromDictionary:dictionary];
+    __block NSData *primaryData = nil;
+    __block NSData *positionData = nil;
+    __block NSError *primaryError = nil;
+    __block NSError *positionError = nil;
+
+    dispatch_group_t group = dispatch_group_create();
+    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0);
+    dispatch_group_async(group, queue, ^{
+        primaryData = [self runMediaControlArguments:@[@"get", @"--now", @"--no-artwork"]
+                                               error:&primaryError];
+    });
+    dispatch_group_async(group, queue, ^{
+        positionData = [self runScriptNamed:@"now-playing.js" arguments:@[] error:&positionError];
+    });
+    dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+
+    NSError *primaryParseError = nil;
+    NSError *positionParseError = nil;
+    NSDictionary *primaryDictionary = primaryData.length > 0
+        ? [NSJSONSerialization JSONObjectWithData:primaryData options:0 error:&primaryParseError]
+        : nil;
+    NSDictionary *positionDictionary = positionData.length > 0
+        ? [NSJSONSerialization JSONObjectWithData:positionData options:0 error:&positionParseError]
+        : nil;
+    KTLNowPlaying *primary = [primaryDictionary isKindOfClass:NSDictionary.class]
+        ? [KTLNowPlaying nowPlayingFromDictionary:primaryDictionary]
+        : nil;
+    KTLNowPlaying *positionSource = [positionDictionary isKindOfClass:NSDictionary.class]
+        ? [KTLNowPlaying nowPlayingFromDictionary:positionDictionary]
+        : nil;
+    KTLNowPlaying *result = [KTLNowPlaying reconciledPrimary:primary positionSource:positionSource];
+    if (!result && error) {
+        *error = primaryError ?: positionError ?: primaryParseError ?: positionParseError;
+    }
+    return result;
 }
 
 - (BOOL)sendCommand:(KTLMediaCommand)command error:(NSError **)error {

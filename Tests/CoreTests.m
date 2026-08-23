@@ -85,6 +85,41 @@ int main(void) {
         Assert(fabs(mediaControlFallbackState.elapsed - 18.5) < 0.001,
                @"media-control elapsedTime should be accepted when live position is absent");
 
+        KTLNowPlaying *seekPrimary = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"拖动测试",
+            @"artist": @"测试歌手",
+            @"duration": @240,
+            @"elapsedTimeNow": @42,
+            @"playing": @YES
+        }];
+        KTLNowPlaying *seekPosition = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"拖动测试",
+            @"artist": @"测试歌手",
+            @"duration": @240,
+            @"elapsed": @137,
+            @"playing": @YES
+        }];
+        KTLNowPlaying *seekResult = [KTLNowPlaying reconciledPrimary:seekPrimary
+                                                      positionSource:seekPosition];
+        Assert(fabs(seekResult.elapsed - 137) < 0.001,
+               @"direct playback position should correct stale progress after seeking");
+
+        KTLNowPlaying *otherTrackPosition = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"另一首歌",
+            @"elapsed": @9
+        }];
+        [KTLNowPlaying reconciledPrimary:seekPrimary positionSource:otherTrackPosition];
+        Assert(fabs(seekPrimary.elapsed - 137) < 0.001,
+               @"a racing snapshot from another track must not change the position");
+
+        KTLNowPlaying *missingPosition = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"拖动测试",
+            @"elapsed": NSNull.null
+        }];
+        [KTLNowPlaying reconciledPrimary:seekPrimary positionSource:missingPosition];
+        Assert(fabs(seekPrimary.elapsed - 137) < 0.001,
+               @"a missing position must not reset lyrics to the beginning");
+
         KTLNowPlaying *transitionState = [KTLNowPlaying nowPlayingFromDictionary:@{
             @"title": @"切歌中",
             @"duration": NSNull.null,

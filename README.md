@@ -1,4 +1,4 @@
-# Kugou Touch Bar Lyrics
+# KugouLyricsx
 
 一个非官方的 macOS 菜单栏小工具：读取酷狗音乐正在播放的歌曲，在配备 Touch Bar 的 MacBook Pro 上显示逐句歌词，并提供上一曲、播放/暂停、下一曲按钮。
 
@@ -7,10 +7,19 @@
 - Touch Bar 显示当前一句歌词
 - Touch Bar 空心细线图标快捷控制：上一曲、播放/暂停、下一曲
 - 菜单栏显示当前歌曲与当前歌词
+- 拖动酷狗进度条后，歌词会重新校准到新的播放位置
 - 优先读取酷狗本地 KRC 歌词，离线也可使用已缓存歌词
 - 本地无歌词时，尝试网易云音乐和 LRCLIB 的公开歌词接口
 - 支持歌词时间偏移微调（菜单栏内 ±0.5 秒）
 - 可选择在酷狗播放期间保持主屏幕常亮
+
+## 与 LyricsX 的关系
+
+KugouLyricsx 是一个针对酷狗音乐独立开发的 macOS 工具，不是 LyricsX 的插件、补丁、分支或修改版。项目没有复制或修改 LyricsX 的源代码，运行时也不需要安装 LyricsX。
+
+两者只是目标相似：都读取 macOS 的“正在播放”信息，并在 Touch Bar 上提供同步歌词体验。KugouLyricsx 的 Touch Bar 界面、歌词解析与同步、酷狗识别、播放控制和防熄屏功能均在本项目中独立实现。
+
+项目随包使用的第三方组件是 `media-control / mediaremote-adapter`，用于读取 macOS 媒体状态和发送播放命令；它不是 LyricsX 的组件，许可信息见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 系统要求
 
@@ -26,9 +35,11 @@
 
 ## 安装
 
-1. 打开 `KugouTouchBarLyrics-0.2.5.dmg`。
-2. 将“酷狗 Touch Bar 歌词”拖入“应用程序”。
+1. 打开 `KugouLyricsx-0.3.0.dmg`。
+2. 将 `KugouLyricsx` 拖入“应用程序”。
 3. 启动酷狗音乐并播放歌曲，再打开本应用。
+
+如果安装过旧名称 `KugouTouchBarLyrics.app`，请先退出旧版本并将它从“应用程序”移除，避免新旧两个菜单栏程序同时运行。改名后的版本会被 macOS 视为新的 App，原来的“播放时保持主屏幕常亮”开关需要重新设置一次。
 
 ### 是否需要允许“任何来源”
 
@@ -39,7 +50,7 @@
 1. 确认 App 来自本项目可信的 GitHub 仓库或 Release 页面，并已拖入“应用程序”。
 2. 先正常打开一次；如果 macOS 阻止运行，关闭提示窗口。
 3. 打开“系统设置 → 隐私与安全性”，向下滚动到“安全性”。
-4. 找到被阻止的“酷狗 Touch Bar 歌词”，点击“仍要打开”，然后按系统提示确认。该按钮通常只会在尝试启动后的一段时间内出现。
+4. 找到被阻止的 `KugouLyricsx`，点击“仍要打开”，然后按系统提示确认。该按钮通常只会在尝试启动后的一段时间内出现。
 5. 以后可以像普通 App 一样直接打开，无需重复操作。
 
 也可以先在 Finder 中按住 Control 键点按 App，选择“打开”，再在确认窗口中选择“打开”。不同 macOS 版本显示的文字可能略有不同。Apple 官方说明见：[打开来自未知开发者的 Mac App](https://support.apple.com/zh-cn/guide/mac-help/-mh40616/mac)。
@@ -56,7 +67,7 @@ Touch Bar 从左到右显示：
 
 这些图标由 Objective-C 使用 `NSBezierPath` 绘制为 22pt 矢量路径，再以 2x 分辨率渲染成白色非模板图片，放入 44pt 的原生 Touch Bar 按钮。使用非模板图片是为了避免系统模态 Touch Bar 将白色模板错误地重新着色为黑色。
 
-菜单栏图标中可以查看当前歌曲、当前歌词，调整歌词时间偏移，或退出应用。切歌后程序会自动重新查找歌词。
+菜单栏图标中可以查看当前歌曲、当前歌词，调整歌词时间偏移，或退出应用。切歌后程序会自动重新查找歌词；拖动酷狗进度条后，程序会从第二套实时播放位置重新校准歌词，通常会在约 1 秒内跳到对应歌词。
 
 “播放时保持主屏幕常亮”默认关闭。开启后，设置会被保存；只有酷狗正在播放时才阻止主屏幕因空闲休眠，暂停、退出酷狗或退出本应用后会自动恢复系统休眠行为。该功能使用 macOS 的电源断言，不需要辅助功能权限；开启会增加电池消耗。
 
@@ -73,9 +84,9 @@ make release
 
 生成文件：
 
-- `dist/KugouTouchBarLyrics.app`
-- `dist/KugouTouchBarLyrics-0.2.5.dmg`
-- `dist/KugouTouchBarLyrics-0.2.5-app.zip`（适合放在 GitHub Release）
+- `dist/KugouLyricsx.app`
+- `dist/KugouLyricsx-0.3.0.dmg`
+- `dist/KugouLyricsx-0.3.0-app.zip`（适合放在 GitHub Release）
 
 运行核心逻辑测试：
 
@@ -83,13 +94,21 @@ make release
 make test
 ```
 
-项目使用 Objective-C、AppKit 和系统自带的 clang 构建，不需要 Python、CocoaPods 或其他包管理器。
+项目使用 Objective-C、AppKit 和系统自带的 clang 构建，不需要 Python、CocoaPods 或其他包管理器。应用图标的 1024×1024 PNG 母版位于 `Resources/AppIcon.png`，构建时会自动生成 macOS 的 ICNS 图标。
 
 ## 工作方式与隐私
 
 应用只在本机读取系统“正在播放”信息和酷狗本地歌词缓存。找不到本地歌词时，才会把歌曲名和歌手名发送给 `music.163.com` 与 `lrclib.net` 搜索歌词。应用不收集账户、播放历史或个人资料。
 
 播放控制通过随应用打包的 `media-control` 工具发送给 macOS 当前媒体会话。第三方组件的许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## v0.3.0 更新内容
+
+- 软件正式更名为 `KugouLyricsx`
+- 增加原创 macOS 应用图标
+- 修复拖动酷狗进度条后歌词仍停留在旧进度的问题
+- 保留上一曲、播放/暂停、下一曲与主屏幕常亮设置
+- 更新 App、DMG、ZIP、README 和内部应用标识
 
 ## 已知限制
 
@@ -101,7 +120,6 @@ make test
 - 在线歌词来自第三方公开接口，接口变化、网络异常或歌曲信息不一致时可能找不到歌词。
 - 目前只在一台 Touch Bar Mac 和酷狗音乐 3.3.2 上完成真实播放验证；没有 Touch Bar UI 自动化测试。
 - 当前打包的媒体控制组件只有 arm64 版本，因此此发布包不支持 Intel Mac。
-- 当前仍使用系统默认应用图标。
 
 ## 项目结构
 
@@ -110,6 +128,7 @@ Sources/App       菜单栏与 Touch Bar 界面
 Sources/Media     正在播放信息与媒体控制
 Sources/Lyrics    KRC 解码、本地查找与在线回退
 Sources/Core      LRC 时间轴、歌曲模型与缓存
+Resources         App 图标、应用信息与媒体桥接脚本
 Tests             核心逻辑测试
 Vendor            随应用分发的第三方媒体控制组件
 scripts           App 与 DMG 打包脚本
@@ -119,4 +138,4 @@ scripts           App 与 DMG 打包脚本
 
 本项目源码采用 MIT License，见 [LICENSE](LICENSE)。`media-control` 及其 `mediaremote-adapter` 依照 BSD 3-Clause License 分发，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-本项目与酷狗音乐及其运营方没有隶属、授权或背书关系。“酷狗音乐”及相关商标归其权利人所有。歌词版权归原作者及相应权利人所有，本工具只展示酷狗客户端已缓存或第三方服务返回的歌词，不随仓库分发歌词内容。
+本项目与 LyricsX、酷狗音乐及其运营方没有隶属、授权或背书关系。“LyricsX”“酷狗音乐”及相关商标归各自权利人所有。歌词版权归原作者及相应权利人所有，本工具只展示酷狗客户端已缓存或第三方服务返回的歌词，不随仓库分发歌词内容。

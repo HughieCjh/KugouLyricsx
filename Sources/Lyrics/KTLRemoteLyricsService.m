@@ -19,7 +19,7 @@
 - (nullable id)JSONForURL:(NSURL *)URL {
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:URL];
     request.timeoutInterval = 8;
-    [request setValue:@"Mozilla/5.0 KugouTouchBarLyrics/0.1" forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"Mozilla/5.0 KugouLyricsx/0.3" forHTTPHeaderField:@"User-Agent"];
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
     __block NSData *responseData = nil;
     NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:request

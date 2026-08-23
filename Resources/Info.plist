@@ -3,16 +3,17 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key><string>zh_CN</string>
-    <key>CFBundleDisplayName</key><string>酷狗 Touch Bar 歌词</string>
-    <key>CFBundleExecutable</key><string>KugouTouchBarLyrics</string>
-    <key>CFBundleIdentifier</key><string>com.hughie.KugouTouchBarLyrics</string>
+    <key>CFBundleDisplayName</key><string>KugouLyricsx</string>
+    <key>CFBundleExecutable</key><string>KugouLyricsx</string>
+    <key>CFBundleIdentifier</key><string>com.hughie.KugouLyricsx</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-    <key>CFBundleName</key><string>KugouTouchBarLyrics</string>
+    <key>CFBundleName</key><string>KugouLyricsx</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.2.5</string>
-    <key>CFBundleVersion</key><string>8</string>
+    <key>CFBundleShortVersionString</key><string>0.3.0</string>
+    <key>CFBundleVersion</key><string>9</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
-    <key>NSHumanReadableCopyright</key><string>Copyright © 2026 KugouTouchBarLyrics contributors</string>
+    <key>NSHumanReadableCopyright</key><string>Copyright © 2026 KugouLyricsx contributors</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
 </dict>

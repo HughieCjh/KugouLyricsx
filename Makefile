@@ -9,11 +9,11 @@ LYRICS := Sources/Lyrics/KTLKRCDecoder.m Sources/Lyrics/KTLKugouLocalLyricsProvi
 
 all: app
 
-build/KugouTouchBarLyrics: $(CORE) $(MEDIA) $(LYRICS) Sources/App/KTLTouchBarController.m Sources/App/KTLAppDelegate.m Sources/App/main.m
+build/KugouLyricsx: $(CORE) $(MEDIA) $(LYRICS) Sources/App/KTLTouchBarController.m Sources/App/KTLAppDelegate.m Sources/App/main.m
 	@mkdir -p build
 	$(CC) $(CFLAGS) -framework Foundation -framework AppKit -framework IOKit -lz $^ -o $@
 
-app: build/KugouTouchBarLyrics
+app: build/KugouLyricsx
 	sh scripts/build-app.sh
 
 dmg: app

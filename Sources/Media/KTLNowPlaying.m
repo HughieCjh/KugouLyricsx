@@ -1,17 +1,27 @@
 #import "KTLNowPlaying.h"
 
+@interface KTLNowPlaying ()
+@property(nonatomic, assign, readwrite) BOOL hasElapsed;
+@end
+
 @implementation KTLNowPlaying
 
 + (double)safeDoubleFromValue:(id)value {
     return [value respondsToSelector:@selector(doubleValue)] ? [value doubleValue] : 0;
 }
 
-+ (double)firstDoubleFromDictionary:(NSDictionary *)dictionary keys:(NSArray<NSString *> *)keys {
++ (BOOL)firstDoubleFromDictionary:(NSDictionary *)dictionary
+                             keys:(NSArray<NSString *> *)keys
+                            value:(double *)result {
     for (NSString *key in keys) {
         id value = dictionary[key];
-        if ([value respondsToSelector:@selector(doubleValue)]) return [value doubleValue];
+        if ([value respondsToSelector:@selector(doubleValue)]) {
+            if (result) *result = [value doubleValue];
+            return YES;
+        }
     }
-    return 0;
+    if (result) *result = 0;
+    return NO;
 }
 
 + (instancetype)nowPlayingFromDictionary:(NSDictionary *)dictionary {
@@ -24,14 +34,34 @@
     state.bundleIdentifier = [dictionary[@"bundleIdentifier"] isKindOfClass:NSString.class] ? dictionary[@"bundleIdentifier"] : @"";
     state.appName = [dictionary[@"appName"] isKindOfClass:NSString.class] ? dictionary[@"appName"] : @"";
     state.duration = [self safeDoubleFromValue:dictionary[@"duration"]];
-    state.elapsed = [self firstDoubleFromDictionary:dictionary
-                                               keys:@[@"elapsedTimeNow", @"elapsedTime", @"elapsed"]];
+    double elapsed = 0;
+    state.hasElapsed = [self firstDoubleFromDictionary:dictionary
+                                                  keys:@[@"elapsedTimeNow", @"elapsedTime", @"elapsed"]
+                                                 value:&elapsed];
+    state.elapsed = elapsed;
     state.playbackRate = [self safeDoubleFromValue:dictionary[@"playbackRate"]];
     id playing = dictionary[@"playing"];
     state.reportedPlaying = [playing respondsToSelector:@selector(boolValue)]
         ? [playing boolValue]
         : state.playbackRate > 0.001;
     return state;
+}
+
++ (instancetype)reconciledPrimary:(KTLNowPlaying *)primary
+                    positionSource:(KTLNowPlaying *)positionSource {
+    if (!primary) return positionSource;
+    if (!positionSource || !positionSource.hasElapsed) return primary;
+
+    BOOL sameTitle = [primary.title isEqualToString:positionSource.title];
+    BOOL sameArtist = primary.artist.length == 0 || positionSource.artist.length == 0 ||
+        [primary.artist isEqualToString:positionSource.artist];
+    BOOL compatibleDuration = primary.duration <= 0 || positionSource.duration <= 0 ||
+        fabs(primary.duration - positionSource.duration) < 4.0;
+    if (sameTitle && sameArtist && compatibleDuration) {
+        primary.elapsed = MAX(0, positionSource.elapsed);
+        primary.hasElapsed = YES;
+    }
+    return primary;
 }
 
 - (BOOL)isPlaying { return self.reportedPlaying; }
@@ -48,6 +78,7 @@
         @"album": self.album ?: @"",
         @"duration": @(self.duration),
         @"elapsed": @(self.elapsed),
+        @"hasElapsed": @(self.hasElapsed),
         @"playbackRate": @(self.playbackRate),
         @"bundleIdentifier": self.bundleIdentifier ?: @"",
         @"appName": self.appName ?: @"",

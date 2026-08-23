@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Kugou Touch Bar Lyrics includes the following third-party software.
+KugouLyricsx includes the following third-party software.
 
 ## media-control / mediaremote-adapter 0.7.6
 

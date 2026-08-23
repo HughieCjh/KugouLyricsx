@@ -2,11 +2,11 @@
 #import <dlfcn.h>
 #import <objc/message.h>
 
-static NSTouchBarItemIdentifier const KTLTrayIdentifier = @"com.hughie.KugouTouchBarLyrics.tray";
-static NSTouchBarItemIdentifier const KTLPreviousIdentifier = @"com.hughie.KugouTouchBarLyrics.previous";
-static NSTouchBarItemIdentifier const KTLLyricIdentifier = @"com.hughie.KugouTouchBarLyrics.lyric";
-static NSTouchBarItemIdentifier const KTLToggleIdentifier = @"com.hughie.KugouTouchBarLyrics.toggle";
-static NSTouchBarItemIdentifier const KTLNextIdentifier = @"com.hughie.KugouTouchBarLyrics.next";
+static NSTouchBarItemIdentifier const KTLTrayIdentifier = @"com.hughie.KugouLyricsx.tray";
+static NSTouchBarItemIdentifier const KTLPreviousIdentifier = @"com.hughie.KugouLyricsx.previous";
+static NSTouchBarItemIdentifier const KTLLyricIdentifier = @"com.hughie.KugouLyricsx.lyric";
+static NSTouchBarItemIdentifier const KTLToggleIdentifier = @"com.hughie.KugouLyricsx.toggle";
+static NSTouchBarItemIdentifier const KTLNextIdentifier = @"com.hughie.KugouLyricsx.next";
 
 typedef void (*KTLSetControlStripPresence)(NSString *, BOOL);
 typedef void (*KTLShowsCloseBox)(BOOL);

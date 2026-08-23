@@ -61,7 +61,7 @@ static NSString *const KTLKeepDisplayAwakePreferenceKey = @"KTLKeepDisplayAwakeW
 - (void)configureStatusMenu {
     self.statusItem = [NSStatusBar.systemStatusBar statusItemWithLength:NSVariableStatusItemLength];
     self.statusItem.button.title = @"♪";
-    self.statusItem.button.toolTip = @"酷狗 Touch Bar 歌词";
+    self.statusItem.button.toolTip = @"KugouLyricsx";
 
     NSMenu *menu = [NSMenu new];
     self.statusMenuItem = [[NSMenuItem alloc] initWithTitle:@"等待酷狗播放" action:nil keyEquivalent:@""];
@@ -87,7 +87,7 @@ static NSString *const KTLKeepDisplayAwakePreferenceKey = @"KTLKeepDisplayAwakeW
 }
 
 - (void)startPolling {
-    self.pollingQueue = dispatch_queue_create("com.hughie.KugouTouchBarLyrics.polling", DISPATCH_QUEUE_SERIAL);
+    self.pollingQueue = dispatch_queue_create("com.hughie.KugouLyricsx.polling", DISPATCH_QUEUE_SERIAL);
     self.pollingTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.pollingQueue);
     dispatch_source_set_timer(self.pollingTimer, DISPATCH_TIME_NOW, NSEC_PER_SEC, NSEC_PER_MSEC * 100);
     __weak typeof(self) weakSelf = self;

@@ -1,7 +1,7 @@
 #import "KTLKRCDecoder.h"
 #import <zlib.h>
 
-static NSString *const KTLKRCErrorDomain = @"KugouTouchBarLyrics.KRC";
+static NSString *const KTLKRCErrorDomain = @"KugouLyricsx.KRC";
 static const uint8_t KTLKRCKey[16] = {
     0x40, 0x47, 0x61, 0x77, 0x5E, 0x32, 0x74, 0x47,
     0x51, 0x36, 0x31, 0x2D, 0xCE, 0xD2, 0x6E, 0x69

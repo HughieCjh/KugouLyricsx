@@ -10,11 +10,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, copy) NSString *appName;
 @property(nonatomic, assign) NSTimeInterval duration;
 @property(nonatomic, assign) NSTimeInterval elapsed;
+@property(nonatomic, readonly) BOOL hasElapsed;
 @property(nonatomic, assign) double playbackRate;
 @property(nonatomic, assign) BOOL reportedPlaying;
 @property(nonatomic, readonly) BOOL isPlaying;
 @property(nonatomic, readonly) BOOL isKugou;
 + (nullable instancetype)nowPlayingFromDictionary:(NSDictionary *)dictionary;
++ (nullable instancetype)reconciledPrimary:(nullable KTLNowPlaying *)primary
+                            positionSource:(nullable KTLNowPlaying *)positionSource;
 - (NSDictionary *)dictionaryRepresentation;
 @end
 
