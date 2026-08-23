@@ -18,6 +18,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable instancetype)nowPlayingFromDictionary:(NSDictionary *)dictionary;
 + (nullable instancetype)reconciledPrimary:(nullable KTLNowPlaying *)primary
                             positionSource:(nullable KTLNowPlaying *)positionSource;
++ (nullable instancetype)foregroundSafeObservedState:(nullable KTLNowPlaying *)observed
+                                         currentState:(nullable KTLNowPlaying *)currentState
+                                     estimatedElapsed:(NSTimeInterval)estimatedElapsed;
+- (void)applyConfirmedElapsed:(NSTimeInterval)elapsed;
 - (NSDictionary *)dictionaryRepresentation;
 @end
 

@@ -2,6 +2,7 @@
 #import "../Media/KTLMediaRemoteClient.h"
 #import "../Media/KTLNowPlaying.h"
 #import "../Media/KTLMediaRemoteObserver.h"
+#import "../Media/KTLKugouAccessibilityPositionProvider.h"
 #import "../Lyrics/KTLKugouLocalLyricsProvider.h"
 #import "../Lyrics/KTLRemoteLyricsService.h"
 #import "../Core/KTLLyricTimeline.h"
@@ -16,16 +17,23 @@ static NSString *const KTLKeepDisplayAwakePreferenceKey = @"KTLKeepDisplayAwakeW
 static NSString *const KTLLyricOffsetPreferenceKey = @"KTLLyricOffset";
 static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextLyric";
 
+static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
+    NSString *identifier = application.bundleIdentifier.lowercaseString ?: @"";
+    return [identifier containsString:@"kugou"] || [identifier containsString:@"kgmusic"];
+}
+
 @interface KTLAppDelegate ()
 @property(nonatomic, strong) NSStatusItem *statusItem;
 @property(nonatomic, strong) NSMenuItem *statusMenuItem;
 @property(nonatomic, strong) NSMenuItem *keepAwakeMenuItem;
 @property(nonatomic, strong) NSMenuItem *showNextLyricMenuItem;
+@property(nonatomic, strong) NSMenuItem *accessibilityPositionMenuItem;
 @property(nonatomic, strong) NSTextField *lyricOffsetLabel;
 @property(nonatomic, strong) NSSlider *lyricOffsetSlider;
 @property(nonatomic, strong) KTLTouchBarController *touchBarController;
 @property(nonatomic, strong) KTLMediaRemoteClient *mediaClient;
 @property(nonatomic, strong) KTLMediaRemoteObserver *mediaObserver;
+@property(nonatomic, strong) KTLKugouAccessibilityPositionProvider *accessibilityPositionProvider;
 @property(nonatomic, strong) KTLKugouLocalLyricsProvider *localLyricsProvider;
 @property(nonatomic, strong) KTLRemoteLyricsService *remoteLyricsService;
 @property(nonatomic, strong, nullable) KTLLyricTimeline *timeline;
@@ -57,6 +65,7 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
 @property(nonatomic, assign) BOOL hasDisplaySleepAssertion;
 @property(nonatomic, assign) BOOL displaySleepAssertionFailed;
 @property(nonatomic, assign) IOPMAssertionID displaySleepAssertionID;
+@property(nonatomic, assign) BOOL kugouIsFrontmost;
 @end
 
 @implementation KTLAppDelegate
@@ -74,6 +83,8 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
     self.liveLyricDetector = [KTLLiveLyricDetector new];
     self.adaptiveTimingModel = [KTLAdaptiveTimingModel new];
     self.playbackStateResolver = [KTLPlaybackStateResolver new];
+    self.kugouIsFrontmost = KTLApplicationIsKugou(
+        NSWorkspace.sharedWorkspace.frontmostApplication);
     self.keepDisplayAwakeWhilePlaying = [NSUserDefaults.standardUserDefaults
         boolForKey:KTLKeepDisplayAwakePreferenceKey];
     self.lyricOffset = MIN(3.0, MAX(-3.0, [NSUserDefaults.standardUserDefaults
@@ -84,11 +95,12 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
 
     NSURL *resources = NSBundle.mainBundle.resourceURL;
     self.mediaClient = [[KTLMediaRemoteClient alloc] initWithResourcesDirectory:resources];
+    self.accessibilityPositionProvider = [KTLKugouAccessibilityPositionProvider new];
     __weak typeof(self) weakSelf = self;
     self.mediaObserver = [[KTLMediaRemoteObserver alloc]
         initWithResourcesDirectory:resources
                            handler:^(KTLNowPlaying *state) {
-        if (state.isKugou) [weakSelf applySnapshot:state];
+        if (state.isKugou) [weakSelf applyObservedSnapshot:state];
     }];
     NSString *lyricsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Containers/com.kugou.mac.Music/Data/Documents/Caches/kgLyric"];
     self.localLyricsProvider = [[KTLKugouLocalLyricsProvider alloc]
@@ -105,6 +117,13 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
                                                           object:nil];
     [self startPolling];
     [self.mediaObserver start];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        if (![self.accessibilityPositionProvider isAuthorized]) {
+            [self.accessibilityPositionProvider requestAuthorization];
+            [self updateAccessibilityPositionMenuItem];
+        }
+    });
 }
 
 - (void)configureStatusMenu {
@@ -126,6 +145,13 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
         ? NSControlStateValueOn
         : NSControlStateValueOff;
     [menu addItem:self.showNextLyricMenuItem];
+    self.accessibilityPositionMenuItem = [[NSMenuItem alloc]
+        initWithTitle:@"酷狗进度同步：检查授权中"
+               action:@selector(requestAccessibilityPositionAuthorization:)
+        keyEquivalent:@""];
+    self.accessibilityPositionMenuItem.target = self;
+    [menu addItem:self.accessibilityPositionMenuItem];
+    [self updateAccessibilityPositionMenuItem];
     self.keepAwakeMenuItem = [[NSMenuItem alloc]
         initWithTitle:@"播放时保持主屏幕常亮"
                action:@selector(toggleKeepAwake:)
@@ -183,8 +209,16 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
         if (!self) return;
         NSError *error = nil;
         KTLNowPlaying *state = [self.mediaClient snapshotWithError:&error];
+        NSNumber *accessibilityElapsed = self.kugouIsFrontmost
+            ? [self.accessibilityPositionProvider
+                currentElapsedTimeForExpectedDuration:state.duration]
+            : nil;
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (state.isKugou) [self applySnapshot:state];
+            [self updateAccessibilityPositionMenuItem];
+            if (state.isKugou) {
+                [self applyAccessibilityElapsed:accessibilityElapsed toSnapshot:state];
+                [self applySnapshot:state];
+            }
             else if (!state || !state.isKugou) [self applyIdleState:error];
         });
     });
@@ -196,6 +230,44 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
                                               userInfo:nil
                                                repeats:YES];
     [NSRunLoop.mainRunLoop addTimer:self.displayTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)applyAccessibilityElapsed:(NSNumber *)accessibilityElapsed
+                       toSnapshot:(KTLNowPlaying *)state {
+    if (!self.kugouIsFrontmost || !accessibilityElapsed || !state.isKugou) return;
+    NSTimeInterval elapsed = accessibilityElapsed.doubleValue;
+    if (!self.nowPlaying || ![self.activeTrackKey isEqual:[self trackKeyForState:state]]) {
+        [state applyConfirmedElapsed:elapsed];
+        return;
+    }
+
+    NSTimeInterval estimatedElapsed = [self estimatedElapsed];
+    NSTimeInterval resolvedElapsed = [KTLKugouAccessibilityPositionProvider
+        shouldAdoptElapsed:elapsed estimatedElapsed:estimatedElapsed]
+        ? elapsed
+        : estimatedElapsed;
+    [state applyConfirmedElapsed:resolvedElapsed];
+}
+
+- (void)updateAccessibilityPositionMenuItem {
+    if (!self.accessibilityPositionMenuItem) return;
+    BOOL authorized = self.accessibilityPositionProvider.isAuthorized;
+    self.accessibilityPositionMenuItem.title = authorized
+        ? @"酷狗进度同步：已启用"
+        : @"酷狗进度同步：点击授权辅助功能";
+    self.accessibilityPositionMenuItem.state = authorized
+        ? NSControlStateValueOn
+        : NSControlStateValueOff;
+}
+
+- (void)requestAccessibilityPositionAuthorization:(id)sender {
+    (void)sender;
+    BOOL authorized = [self.accessibilityPositionProvider requestAuthorization];
+    [self updateAccessibilityPositionMenuItem];
+    if (authorized) return;
+    NSURL *settingsURL = [NSURL URLWithString:
+        @"x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"];
+    if (settingsURL) [NSWorkspace.sharedWorkspace openURL:settingsURL];
 }
 
 - (void)applySnapshot:(KTLNowPlaying *)state {
@@ -269,28 +341,49 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
     if (trackChanged || seeked) [self restoreTouchBarAfterTrackChange];
 }
 
+- (void)applyObservedSnapshot:(KTLNowPlaying *)state {
+    if (self.kugouIsFrontmost && self.nowPlaying) {
+        state = [KTLNowPlaying foregroundSafeObservedState:state
+                                              currentState:self.nowPlaying
+                                          estimatedElapsed:[self estimatedElapsed]];
+    }
+    if (state) [self applySnapshot:state];
+}
+
 - (NSString *)trackKeyForState:(KTLNowPlaying *)state {
     return [NSString stringWithFormat:@"%@|%.1f", state.title, state.duration];
 }
 
 - (void)restoreTouchBarAfterTrackChange {
-    [self.touchBarController show];
+    if (self.kugouIsFrontmost) {
+        [self.touchBarController refresh];
+        return;
+    }
+    [self.touchBarController showAndRefresh];
     __weak typeof(self) weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [weakSelf.touchBarController show];
-    });
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [weakSelf.touchBarController show];
-    });
+    for (NSNumber *delay in @[@0.35, @0.9, @1.8]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                     (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [weakSelf.touchBarController showAndRefresh];
+        });
+    }
 }
 
 - (void)frontmostApplicationDidChange:(NSNotification *)notification {
-    (void)notification;
+    NSRunningApplication *activatedApplication = notification.userInfo[NSWorkspaceApplicationKey];
+    BOOL wasKugouFrontmost = self.kugouIsFrontmost;
+    self.kugouIsFrontmost = KTLApplicationIsKugou(activatedApplication);
     if (!self.nowPlaying.isKugou) return;
-    [self.touchBarController show];
-    __weak typeof(self) weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{ [weakSelf.touchBarController show]; });
+    if (self.kugouIsFrontmost) {
+        [self updateDisplayedLyric:nil];
+        return;
+    }
+    if (wasKugouFrontmost) {
+        self.reconcileLiveAnchorFromTimeline = YES;
+        self.lastLiveLyricText = @"";
+    }
+    [self restoreTouchBarAfterTrackChange];
 }
 
 - (void)beginRemoteLyricsFetchForState:(KTLNowPlaying *)state {
@@ -343,7 +436,44 @@ static NSString *const KTLShowNextLyricPreferenceKey = @"KTLShowAlternatingNextL
     NSDictionary<NSString *, id> *currentPresentation = nil;
     NSTimeInterval renderedRelativeTime = 0;
     BOOL hasRenderedRelativeTime = NO;
-    if (self.liveLyricDetector.isActive) {
+    BOOL useForegroundTimeline = self.kugouIsFrontmost &&
+        self.localLyricsCandidate.timingCompatible && self.karaokeTimeline != nil;
+    if (useForegroundTimeline) {
+        NSTimeInterval playbackTime = elapsed + self.lyricOffset;
+        NSDictionary *line = [self.karaokeTimeline lineAtTime:playbackTime];
+        BOOL metadata = [line[@"metadata"] boolValue];
+        if (!line || (metadata && self.hasShownRealLiveLyric)) {
+            line = [self.karaokeTimeline nextLineAfterTime:playbackTime
+                                          excludingMetadata:YES];
+            metadata = NO;
+        }
+        if (metadata) {
+            text = self.hasShownRealLiveLyric ? @"" : line[@"text"] ?: @"";
+        } else if (line) {
+            NSString *lineText = [line[@"text"] isKindOfClass:NSString.class]
+                ? line[@"text"]
+                : @"";
+            NSUInteger sourceIndex = [self.localLyricsCandidate.karaokeLines
+                indexOfObjectIdenticalTo:line];
+            if (sourceIndex == NSNotFound) {
+                sourceIndex = [self.localLyricsCandidate.karaokeLines indexOfObject:line];
+            }
+            NSMutableDictionary *presentation = [line mutableCopy];
+            if (sourceIndex != NSNotFound) presentation[@"sourceIndex"] = @(sourceIndex);
+            if (!presentation[@"sourceRange"]) {
+                presentation[@"sourceRange"] = [NSValue valueWithRange:NSMakeRange(0, lineText.length)];
+            }
+            text = lineText;
+            currentPresentation = presentation;
+            renderedRelativeTime = playbackTime - [line[@"time"] doubleValue];
+            hasRenderedRelativeTime = YES;
+            highlight = [KTLKaraokeTimeline highlightForLine:presentation
+                                                 relativeTime:renderedRelativeTime];
+            if (lineText.length > 0) self.hasShownRealLiveLyric = YES;
+        } else {
+            text = @"";
+        }
+    } else if (self.liveLyricDetector.isActive) {
         text = self.liveTextOverride ?: self.liveLyricDetector.currentLyric;
         [self updateKaraokePresentationIfNeeded];
         text = self.liveTextOverride ?: self.liveLyricDetector.currentLyric;

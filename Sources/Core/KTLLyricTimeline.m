@@ -29,4 +29,21 @@
     return line;
 }
 
+- (NSDictionary<NSString *, id> *)nextLineAfterTime:(NSTimeInterval)time
+                                    excludingMetadata:(BOOL)excludingMetadata {
+    NSUInteger lower = 0;
+    NSUInteger upper = self.lines.count;
+    while (lower < upper) {
+        NSUInteger middle = lower + (upper - lower) / 2;
+        if ([self.lines[middle][@"time"] doubleValue] <= time) lower = middle + 1;
+        else upper = middle;
+    }
+    while (lower < self.lines.count) {
+        NSDictionary<NSString *, id> *line = self.lines[lower];
+        if (!excludingMetadata || ![line[@"metadata"] boolValue]) return line;
+        lower += 1;
+    }
+    return nil;
+}
+
 @end

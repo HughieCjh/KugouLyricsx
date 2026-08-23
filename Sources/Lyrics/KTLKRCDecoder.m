@@ -133,14 +133,24 @@ static const uint8_t KTLKRCKey[16] = {
             }
             segments = adjusted;
         }
+        NSTimeInterval segmentEnd = 0;
+        for (NSDictionary<NSString *, id> *segment in segments) {
+            NSTimeInterval end = [segment[@"offset"] doubleValue] +
+                MAX(0, [segment[@"duration"] doubleValue]);
+            segmentEnd = MAX(segmentEnd, end);
+        }
+        NSTimeInterval effectiveDuration = duration;
+        if (segmentEnd > 0 && duration > segmentEnd + 15.0) {
+            effectiveDuration = segmentEnd;
+        }
         if (text.length > 0) {
             [lines addObject:@{
                 @"time": @(time),
-                @"duration": @(duration),
-                @"endTime": @(time + duration),
+                @"duration": @(effectiveDuration),
+                @"endTime": @(time + effectiveDuration),
                 @"text": text,
                 @"segments": segments,
-                @"metadata": @([self isMetadataText:text time:time duration:duration]),
+                @"metadata": @([self isMetadataText:text time:time duration:effectiveDuration]),
                 @"sourceIndex": @(lines.count)
             }];
         }

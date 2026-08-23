@@ -53,18 +53,47 @@
     if (!positionSource || !positionSource.hasElapsed) return primary;
 
     BOOL sameTitle = [primary.title isEqualToString:positionSource.title];
-    BOOL sameArtist = primary.artist.length == 0 || positionSource.artist.length == 0 ||
-        [primary.artist isEqualToString:positionSource.artist];
     BOOL compatibleDuration = primary.duration <= 0 || positionSource.duration <= 0 ||
         fabs(primary.duration - positionSource.duration) < 4.0;
-    if (sameTitle && sameArtist && compatibleDuration) {
+    if (sameTitle && compatibleDuration) {
         primary.elapsed = MAX(0, positionSource.elapsed);
         primary.hasElapsed = YES;
     }
     return primary;
 }
 
++ (instancetype)foregroundSafeObservedState:(KTLNowPlaying *)observed
+                                 currentState:(KTLNowPlaying *)currentState
+                             estimatedElapsed:(NSTimeInterval)estimatedElapsed {
+    if (!observed || !currentState ||
+        ![observed.title isEqualToString:currentState.title]) return observed;
+
+    if (observed.duration <= 0 && currentState.duration > 0) {
+        observed.duration = currentState.duration;
+    }
+    if (observed.bundleIdentifier.length == 0) {
+        observed.bundleIdentifier = currentState.bundleIdentifier;
+    }
+    if (observed.appName.length == 0) observed.appName = currentState.appName;
+
+    BOOL staleClock = !observed.hasElapsed || !isfinite(observed.elapsed) ||
+        fabs(observed.elapsed - estimatedElapsed) > 1.25;
+    if (staleClock) {
+        observed.elapsed = MAX(0, estimatedElapsed);
+        observed.hasElapsed = YES;
+        observed.playbackRate = currentState.playbackRate;
+        observed.reportedPlaying = currentState.isPlaying;
+    }
+    return observed;
+}
+
 - (BOOL)isPlaying { return self.reportedPlaying; }
+
+- (void)applyConfirmedElapsed:(NSTimeInterval)elapsed {
+    if (!isfinite(elapsed)) return;
+    self.elapsed = MAX(0, elapsed);
+    self.hasElapsed = YES;
+}
 
 - (BOOL)isKugou {
     NSString *identity = [[NSString stringWithFormat:@"%@ %@", self.bundleIdentifier, self.appName] lowercaseString];

@@ -10,6 +10,7 @@
 #import "../Sources/Core/KTLAdaptiveTimingModel.h"
 #import "../Sources/Core/KTLPlaybackStateResolver.h"
 #import "../Sources/Media/KTLNowPlaying.h"
+#import "../Sources/Media/KTLKugouAccessibilityPositionProvider.h"
 #import "../Sources/Lyrics/KTLKRCDecoder.h"
 #import "../Sources/Lyrics/KTLKugouLocalLyricsProvider.h"
 #import "../Sources/Lyrics/KTLRemoteLyricsService.h"
@@ -63,6 +64,18 @@ int main(void) {
         Assert([timedTimeline lineAtTime:1.5] != nil, @"timed KRC line should display during its duration");
         Assert([timedTimeline lineAtTime:3.0] == nil, @"instrumental gap should not retain the previous lyric");
         Assert([timedTimeline lineAtTime:5.5] != nil, @"next timed line should display at its own start");
+        Assert([[[timedTimeline nextLineAfterTime:3.0 excludingMetadata:YES]
+            objectForKey:@"text"] isEqual:@"第二句"],
+               @"a KRC gap should be able to preload the upcoming lyric without retaining the old line");
+
+        KTLLyricTimeline *metadataGapTimeline = [[KTLLyricTimeline alloc] initWithLines:@[
+            @{ @"time": @1.0, @"endTime": @2.0, @"text": @"唱词" },
+            @{ @"time": @3.0, @"endTime": @3.5, @"text": @"作词：测试", @"metadata": @YES },
+            @{ @"time": @5.0, @"endTime": @6.0, @"text": @"下一句" }
+        ]];
+        Assert([[[metadataGapTimeline nextLineAfterTime:2.5 excludingMetadata:YES]
+            objectForKey:@"text"] isEqual:@"下一句"],
+               @"foreground lyric preloading must skip production credits between sung lines");
 
         Assert(![KTLLyricsTimingPolicy isLastLyricEndTime:168.079
                                      compatibleWithTrackDuration:282.754],
@@ -154,6 +167,45 @@ int main(void) {
         }];
         Assert(fabs(mediaControlFallbackState.elapsed - 18.5) < 0.001,
                @"media-control elapsedTime should be accepted when live position is absent");
+        KTLNowPlaying *confirmedPositionState = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"确认位置",
+            @"elapsed": NSNull.null
+        }];
+        [confirmedPositionState applyConfirmedElapsed:94];
+        Assert(confirmedPositionState.hasElapsed &&
+               fabs(confirmedPositionState.elapsed - 94) < 0.001,
+               @"an independently confirmed position should mark the clock as available");
+
+        NSTimeInterval accessibilityElapsed = -1;
+        Assert([KTLKugouAccessibilityPositionProvider parseElapsedTimeText:@"0:46"
+                                                                   elapsed:&accessibilityElapsed] &&
+               fabs(accessibilityElapsed - 46) < 0.001,
+               @"Kugou's minute-second accessibility time should parse");
+        Assert([KTLKugouAccessibilityPositionProvider parseElapsedTimeText:@" 1:34 "
+                                                                   elapsed:&accessibilityElapsed] &&
+               fabs(accessibilityElapsed - 94) < 0.001,
+               @"Kugou's accessibility time should allow surrounding whitespace");
+        Assert([KTLKugouAccessibilityPositionProvider parseElapsedTimeText:@"1:02:03"
+                                                                   elapsed:&accessibilityElapsed] &&
+               fabs(accessibilityElapsed - 3723) < 0.001,
+               @"hour-long accessibility times should parse");
+        Assert(![KTLKugouAccessibilityPositionProvider parseElapsedTimeText:@"1:75"
+                                                                    elapsed:&accessibilityElapsed] &&
+               ![KTLKugouAccessibilityPositionProvider parseElapsedTimeText:@"正在播放"
+                                                                    elapsed:&accessibilityElapsed],
+               @"malformed accessibility times must be rejected");
+        Assert(![KTLKugouAccessibilityPositionProvider shouldAdoptElapsed:100
+                                                         estimatedElapsed:101.4],
+               @"whole-second accessibility rounding must not disturb normal playback");
+        Assert([KTLKugouAccessibilityPositionProvider shouldAdoptElapsed:145
+                                                        estimatedElapsed:44],
+               @"a large accessibility-time difference should confirm a seek");
+        Assert([KTLKugouAccessibilityPositionProvider isAccessibilityDuration:240
+                                                compatibleWithExpectedDuration:240.671],
+               @"a rounded Kugou UI duration should match the same MediaRemote track");
+        Assert(![KTLKugouAccessibilityPositionProvider isAccessibilityDuration:252
+                                                 compatibleWithExpectedDuration:166],
+               @"a stale UI duration from another track must reject its elapsed time");
 
         KTLNowPlaying *seekPrimary = [KTLNowPlaying nowPlayingFromDictionary:@{
             @"title": @"拖动测试",
@@ -173,6 +225,28 @@ int main(void) {
                                                       positionSource:seekPosition];
         Assert(fabs(seekResult.elapsed - 137) < 0.001,
                @"direct playback position should correct stale progress after seeking");
+
+        KTLNowPlaying *lyricArtistPrimary = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"拖动测试",
+            @"artist": @"上一句歌词",
+            @"duration": @240.671,
+            @"elapsedTimeNow": @44.56,
+            @"playing": @YES,
+            @"bundleIdentifier": @"com.kugou.mac.Music"
+        }];
+        KTLNowPlaying *lyricArtistPosition = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"拖动测试",
+            @"artist": @"下一句歌词",
+            @"duration": @240.671,
+            @"elapsed": @139.18,
+            @"playing": @YES,
+            @"bundleIdentifier": @"com.kugou.mac.Music"
+        }];
+        KTLNowPlaying *lyricArtistSeekResult = [KTLNowPlaying
+            reconciledPrimary:lyricArtistPrimary
+               positionSource:lyricArtistPosition];
+        Assert(fabs(lyricArtistSeekResult.elapsed - 139.18) < 0.001,
+               @"Kugou lyric text in the artist field must not block a confirmed seek");
 
         KTLNowPlaying *otherTrackPosition = [KTLNowPlaying nowPlayingFromDictionary:@{
             @"title": @"另一首歌",
@@ -205,6 +279,73 @@ int main(void) {
             @"playing": @NO
         }];
         Assert(!pausedState.isPlaying, @"explicit playing flag should override stale playback rate");
+
+        KTLNowPlaying *reliableForegroundState = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"倒带 (Live)",
+            @"artist": @"当前歌词",
+            @"duration": @276,
+            @"elapsed": @42.5,
+            @"playbackRate": @1,
+            @"playing": @YES,
+            @"bundleIdentifier": @"com.kugou.mac.Music",
+            @"appName": @"酷狗音乐"
+        }];
+        KTLNowPlaying *incompleteFocusEvent = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"倒带 (Live)",
+            @"artist": @"周杰伦",
+            @"playing": @NO,
+            @"bundleIdentifier": @"com.kugou.mac.Music"
+        }];
+        KTLNowPlaying *protectedFocusEvent = [KTLNowPlaying
+            foregroundSafeObservedState:incompleteFocusEvent
+                              currentState:reliableForegroundState
+                          estimatedElapsed:42.75];
+        Assert(fabs(protectedFocusEvent.duration - 276) < 0.001 &&
+               fabs(protectedFocusEvent.elapsed - 42.75) < 0.001 &&
+               protectedFocusEvent.hasElapsed && protectedFocusEvent.isPlaying,
+               @"an incomplete Kugou focus event must preserve duration, clock, and playback state");
+
+        KTLNowPlaying *staleFocusEvent = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"倒带 (Live)",
+            @"artist": @"周杰伦",
+            @"duration": @276,
+            @"elapsedTime": @0.025,
+            @"playbackRate": @1,
+            @"playing": @NO,
+            @"bundleIdentifier": @"com.kugou.mac.Music"
+        }];
+        [KTLNowPlaying foregroundSafeObservedState:staleFocusEvent
+                                      currentState:reliableForegroundState
+                                  estimatedElapsed:42.75];
+        Assert(fabs(staleFocusEvent.elapsed - 42.75) < 0.001 && staleFocusEvent.isPlaying,
+               @"a stale near-zero focus event must not rewind or pause the lyric clock");
+
+        KTLNowPlaying *realPauseEvent = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"倒带 (Live)",
+            @"artist": @"周杰伦",
+            @"duration": @276,
+            @"elapsedTime": @42.8,
+            @"playbackRate": @0,
+            @"playing": @NO,
+            @"bundleIdentifier": @"com.kugou.mac.Music"
+        }];
+        [KTLNowPlaying foregroundSafeObservedState:realPauseEvent
+                                      currentState:reliableForegroundState
+                                  estimatedElapsed:42.75];
+        Assert(!realPauseEvent.isPlaying && fabs(realPauseEvent.elapsed - 42.8) < 0.001,
+               @"a plausible pause at the current position must remain effective");
+
+        KTLNowPlaying *realTrackChange = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"下一首歌",
+            @"elapsedTime": @0.1,
+            @"playing": @YES
+        }];
+        [KTLNowPlaying foregroundSafeObservedState:realTrackChange
+                                      currentState:reliableForegroundState
+                                  estimatedElapsed:42.75];
+        Assert([realTrackChange.title isEqual:@"下一首歌"] &&
+               fabs(realTrackChange.elapsed - 0.1) < 0.001,
+               @"a real title change must not be reconciled with the previous track");
 
         KTLPlaybackStateResolver *playbackResolver = [KTLPlaybackStateResolver new];
         Assert([playbackResolver resolvedPlayingForReportedPlaying:YES elapsed:10.0],
@@ -272,6 +413,13 @@ int main(void) {
                @"KRC line duration should be preserved");
         Assert(fabs([cleanKrcLines[0][@"endTime"] doubleValue] - 22.652) < 0.001,
                @"KRC line end time should be available for instrumental gaps");
+
+        NSArray *malformedTailLines = [KTLKRCParser parseKaraokeString:
+            @"[199078,240779]<0,202,0>看<202,200,0>着<402,6258,0>云里"];
+        NSDictionary *normalizedTail = malformedTailLines.firstObject;
+        Assert(fabs([normalizedTail[@"duration"] doubleValue] - 6.66) < 0.001 &&
+               fabs([normalizedTail[@"endTime"] doubleValue] - 205.738) < 0.001,
+               @"an implausible KRC tail duration should be clamped to its real word timing");
 
         NSArray *allKrcLines = [KTLKRCParser parseKaraokeString:metadataKRC];
         Assert(allKrcLines.count == 4, @"karaoke parsing should retain Kugou title and credit rows");
@@ -346,10 +494,14 @@ int main(void) {
                @"next-row preview should use only the first whitespace-separated Kugou phrase");
 
         NSArray *advanceLines = [KTLKRCParser parseKaraokeString:
-            @"[0,1000]<0,1000,0>当前句\n[1000,1000]<0,1000,0>下一句"];
+            @"[0,1000]<0,1000,0>当前句\n"
+             "[1000,1000]<0,1000,0>下一句\n"
+             "[2000,1000]<0,1000,0>下下句"];
         KTLLyricTimeline *advanceTimeline = [[KTLLyricTimeline alloc] initWithLines:advanceLines];
         Assert([[[advanceTimeline lineAtTime:1.05] objectForKey:@"text"] isEqual:@"下一句"],
                @"positive lyric offset should be able to select and pre-enter the next KRC line");
+        Assert([[[advanceTimeline lineAtTime:2.05] objectForKey:@"text"] isEqual:@"下下句"],
+               @"absolute KRC playback must keep advancing without another live lyric event");
         NSDictionary *offsetNextLine = [KTLKaraokeTimeline
             nextPresentationAfterPresentation:advanceLines.firstObject
                                         lines:advanceLines];

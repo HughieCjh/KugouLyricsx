@@ -11,6 +11,8 @@ NS_ASSUME_NONNULL_BEGIN
 @interface KTLTouchBarController : NSObject <NSTouchBarDelegate>
 @property(nonatomic, weak) id<KTLTouchBarControllerDelegate> delegate;
 - (void)show;
+- (void)refresh;
+- (void)showAndRefresh;
 - (void)dismiss;
 - (void)updateLyric:(NSString *)lyric playing:(BOOL)playing;
 - (void)updateLyric:(NSString *)lyric

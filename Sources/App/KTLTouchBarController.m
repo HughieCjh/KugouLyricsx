@@ -24,13 +24,19 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
 @property(nonatomic, strong) NSCustomTouchBarItem *trayItem;
 @property(nonatomic, strong) KTLKaraokeLyricView *lyricView;
 @property(nonatomic, strong) NSButton *toggleButton;
+@property(nonatomic, strong) NSMutableDictionary<NSNumber *, NSImage *> *mediaIconCache;
+@property(nonatomic, assign) BOOL hasTogglePlayingState;
+@property(nonatomic, assign) BOOL togglePlayingState;
 @end
 
 @implementation KTLTouchBarController
 
 - (instancetype)init {
     self = [super init];
-    if (self) [self configureTouchBar];
+    if (self) {
+        _mediaIconCache = [NSMutableDictionary dictionary];
+        [self configureTouchBar];
+    }
     return self;
 }
 
@@ -93,7 +99,7 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
 - (NSButton *)mediaButtonWithIcon:(KTLMediaIcon)icon
                accessibilityLabel:(NSString *)accessibilityLabel
                              action:(SEL)action {
-    NSButton *button = [NSButton buttonWithImage:[self renderedMediaIcon:icon]
+    NSButton *button = [NSButton buttonWithImage:[self mediaIcon:icon]
                                           target:self
                                           action:action];
     button.imagePosition = NSImageOnly;
@@ -103,6 +109,16 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
     button.accessibilityLabel = accessibilityLabel;
     [button.widthAnchor constraintEqualToConstant:44.0].active = YES;
     return button;
+}
+
+- (NSImage *)mediaIcon:(KTLMediaIcon)icon {
+    NSNumber *key = @(icon);
+    NSImage *image = self.mediaIconCache[key];
+    if (!image) {
+        image = [self renderedMediaIcon:icon];
+        self.mediaIconCache[key] = image;
+    }
+    return image;
 }
 
 - (NSImage *)renderedMediaIcon:(KTLMediaIcon)icon {
@@ -186,6 +202,16 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
     }
 }
 
+- (void)showAndRefresh {
+    [self show];
+    [self refresh];
+}
+
+- (void)refresh {
+    self.lyricView.needsDisplay = YES;
+    [self.lyricView displayIfNeeded];
+}
+
 - (void)dismiss {
     SEL selector = NSSelectorFromString(@"dismissSystemModalTouchBar:");
     if (![NSTouchBar respondsToSelector:selector]) selector = NSSelectorFromString(@"dismissSystemModalFunctionBar:");
@@ -225,12 +251,16 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
               characterFraction:characterFraction
                       dualLine:dualLine
                  currentOnLeft:currentOnLeft];
-    NSString *label = playing ? @"暂停" : @"播放";
-    self.toggleButton.image = [self renderedMediaIcon:(playing
-        ? KTLMediaIconPause
-        : KTLMediaIconPlay)];
-    self.toggleButton.toolTip = label;
-    self.toggleButton.accessibilityLabel = label;
+    if (!self.hasTogglePlayingState || self.togglePlayingState != playing) {
+        self.hasTogglePlayingState = YES;
+        self.togglePlayingState = playing;
+        NSString *label = playing ? @"暂停" : @"播放";
+        self.toggleButton.image = [self mediaIcon:(playing
+            ? KTLMediaIconPause
+            : KTLMediaIconPlay)];
+        self.toggleButton.toolTip = label;
+        self.toggleButton.accessibilityLabel = label;
+    }
 }
 
 @end

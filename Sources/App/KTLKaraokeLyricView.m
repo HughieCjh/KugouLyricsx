@@ -19,7 +19,7 @@
         _text = @"等待酷狗播放";
         _nextText = @"";
         _font = [NSFont systemFontOfSize:15 weight:NSFontWeightMedium];
-        _dualFont = [NSFont systemFontOfSize:12.5 weight:NSFontWeightMedium];
+        _dualFont = [NSFont systemFontOfSize:14.0 weight:NSFontWeightMedium];
         _currentOnLeft = YES;
         self.wantsLayer = YES;
         [self setAccessibilityRole:NSAccessibilityStaticTextRole];
