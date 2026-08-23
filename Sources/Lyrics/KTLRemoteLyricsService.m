@@ -6,6 +6,29 @@
 
 @implementation KTLRemoteLyricsService
 
++ (NSDictionary *)bestNeteaseSongFromItems:(NSArray<NSDictionary *> *)items
+                                      title:(NSString *)title
+                                   duration:(NSTimeInterval)duration {
+    NSDictionary *best = nil;
+    NSTimeInterval bestDifference = DBL_MAX;
+    for (NSDictionary *song in items) {
+        NSString *name = [song[@"name"] isKindOfClass:NSString.class] ? song[@"name"] : @"";
+        if ([name localizedCaseInsensitiveCompare:title] != NSOrderedSame) continue;
+        if (duration <= 0) return song;
+
+        id rawDuration = song[@"duration"] ?: song[@"dt"];
+        if (![rawDuration respondsToSelector:@selector(doubleValue)]) continue;
+        NSTimeInterval candidateDuration = [rawDuration doubleValue];
+        if (candidateDuration > 10000) candidateDuration /= 1000.0;
+        NSTimeInterval difference = fabs(candidateDuration - duration);
+        if (difference < bestDifference) {
+            best = song;
+            bestDifference = difference;
+        }
+    }
+    return bestDifference <= 12.0 ? best : nil;
+}
+
 - (void)fetchLyricsForTitle:(NSString *)title
                    duration:(NSTimeInterval)duration
                  completion:(KTLRemoteLyricsCompletion)completion {
@@ -19,7 +42,7 @@
 - (nullable id)JSONForURL:(NSURL *)URL {
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:URL];
     request.timeoutInterval = 8;
-    [request setValue:@"Mozilla/5.0 KugouLyricsx/0.3" forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"Mozilla/5.0 KugouLyricsx/0.4.0" forHTTPHeaderField:@"User-Agent"];
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
     __block NSData *responseData = nil;
     NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:request
@@ -49,12 +72,9 @@
         [self escaped:title]];
     NSDictionary *search = [self JSONForURL:[NSURL URLWithString:URLString]];
     NSArray *songs = [search[@"result"][@"songs"] isKindOfClass:NSArray.class] ? search[@"result"][@"songs"] : nil;
-    NSDictionary *selected = nil;
-    for (NSDictionary *song in songs) {
-        NSString *name = [song[@"name"] isKindOfClass:NSString.class] ? song[@"name"] : @"";
-        if ([name localizedCaseInsensitiveCompare:title] == NSOrderedSame) { selected = song; break; }
-    }
-    if (!selected) selected = songs.firstObject;
+    NSDictionary *selected = [KTLRemoteLyricsService bestNeteaseSongFromItems:songs
+                                                                        title:title
+                                                                     duration:duration];
     NSNumber *songID = selected[@"id"];
     if (!songID) return nil;
 

@@ -21,7 +21,12 @@
         if ([self.lines[middle][@"time"] doubleValue] <= time) lower = middle + 1;
         else upper = middle;
     }
-    return self.lines[lower - 1];
+    NSDictionary<NSString *, id> *line = self.lines[lower - 1];
+    id endTime = line[@"endTime"];
+    if ([endTime respondsToSelector:@selector(doubleValue)] &&
+        [endTime doubleValue] > [line[@"time"] doubleValue] &&
+        time >= [endTime doubleValue]) return nil;
+    return line;
 }
 
 @end

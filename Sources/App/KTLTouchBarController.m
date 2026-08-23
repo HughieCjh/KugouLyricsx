@@ -1,4 +1,5 @@
 #import "KTLTouchBarController.h"
+#import "KTLKaraokeLyricView.h"
 #import <dlfcn.h>
 #import <objc/message.h>
 
@@ -21,7 +22,7 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
 @interface KTLTouchBarController ()
 @property(nonatomic, strong) NSTouchBar *touchBar;
 @property(nonatomic, strong) NSCustomTouchBarItem *trayItem;
-@property(nonatomic, strong) NSTextField *lyricLabel;
+@property(nonatomic, strong) KTLKaraokeLyricView *lyricView;
 @property(nonatomic, strong) NSButton *toggleButton;
 @end
 
@@ -71,12 +72,9 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
                            accessibilityLabel:@"上一曲"
                                          action:@selector(previous:)];
     } else if ([identifier isEqual:KTLLyricIdentifier]) {
-        self.lyricLabel = [NSTextField labelWithString:@"等待酷狗播放"];
-        self.lyricLabel.alignment = NSTextAlignmentCenter;
-        self.lyricLabel.font = [NSFont systemFontOfSize:15 weight:NSFontWeightMedium];
-        self.lyricLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-        [self.lyricLabel.widthAnchor constraintGreaterThanOrEqualToConstant:280].active = YES;
-        item.view = self.lyricLabel;
+        self.lyricView = [[KTLKaraokeLyricView alloc] initWithFrame:NSMakeRect(0, 0, 280, 30)];
+        [self.lyricView.widthAnchor constraintGreaterThanOrEqualToConstant:280].active = YES;
+        item.view = self.lyricView;
     } else if ([identifier isEqual:KTLToggleIdentifier]) {
         self.toggleButton = [self mediaButtonWithIcon:KTLMediaIconPlay
                                    accessibilityLabel:@"播放"
@@ -197,7 +195,36 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
 }
 
 - (void)updateLyric:(NSString *)lyric playing:(BOOL)playing {
-    self.lyricLabel.stringValue = lyric.length > 0 ? lyric : @"♪";
+    NSString *value = lyric ?: @"";
+    [self updateLyric:value completedLength:value.length characterFraction:0 playing:playing];
+}
+
+- (void)updateLyric:(NSString *)lyric
+    completedLength:(NSUInteger)completedLength
+   characterFraction:(CGFloat)characterFraction
+             playing:(BOOL)playing {
+    [self updateLyric:lyric
+            nextLyric:@""
+      completedLength:completedLength
+     characterFraction:characterFraction
+            dualLine:NO
+       currentOnLeft:YES
+               playing:playing];
+}
+
+- (void)updateLyric:(NSString *)lyric
+          nextLyric:(NSString *)nextLyric
+    completedLength:(NSUInteger)completedLength
+   characterFraction:(CGFloat)characterFraction
+          dualLine:(BOOL)dualLine
+     currentOnLeft:(BOOL)currentOnLeft
+             playing:(BOOL)playing {
+    [self.lyricView updateText:lyric
+                      nextText:nextLyric
+               completedLength:completedLength
+              characterFraction:characterFraction
+                      dualLine:dualLine
+                 currentOnLeft:currentOnLeft];
     NSString *label = playing ? @"暂停" : @"播放";
     self.toggleButton.image = [self renderedMediaIcon:(playing
         ? KTLMediaIconPause

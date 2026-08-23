@@ -9,6 +9,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface KTLKRCParser : NSObject
 + (NSArray<NSDictionary<NSString *, id> *> *)parseString:(NSString *)source;
++ (NSArray<NSDictionary<NSString *, id> *> *)parseKaraokeString:(NSString *)source;
 @end
 
 NS_ASSUME_NONNULL_END

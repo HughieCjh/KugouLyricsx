@@ -13,6 +13,17 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)show;
 - (void)dismiss;
 - (void)updateLyric:(NSString *)lyric playing:(BOOL)playing;
+- (void)updateLyric:(NSString *)lyric
+    completedLength:(NSUInteger)completedLength
+   characterFraction:(CGFloat)characterFraction
+             playing:(BOOL)playing;
+- (void)updateLyric:(NSString *)lyric
+          nextLyric:(NSString *)nextLyric
+    completedLength:(NSUInteger)completedLength
+   characterFraction:(CGFloat)characterFraction
+          dualLine:(BOOL)dualLine
+     currentOnLeft:(BOOL)currentOnLeft
+             playing:(BOOL)playing;
 @end
 
 NS_ASSUME_NONNULL_END

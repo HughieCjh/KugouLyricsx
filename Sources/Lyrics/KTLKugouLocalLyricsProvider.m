@@ -1,5 +1,6 @@
 #import "KTLKugouLocalLyricsProvider.h"
 #import "KTLKRCDecoder.h"
+#import "../Core/KTLLyricsTimingPolicy.h"
 
 @implementation KTLKugouLocalLyricsResult
 @end
@@ -17,6 +18,12 @@
 }
 
 - (KTLKugouLocalLyricsResult *)lyricsForTitle:(NSString *)title error:(NSError **)error {
+    return [self lyricsForTitle:title duration:0 error:error];
+}
+
+- (KTLKugouLocalLyricsResult *)lyricsForTitle:(NSString *)title
+                                      duration:(NSTimeInterval)duration
+                                         error:(NSError **)error {
     NSArray<NSURL *> *files = [NSFileManager.defaultManager contentsOfDirectoryAtURL:self.lyricsDirectory
                                                           includingPropertiesForKeys:@[NSURLContentModificationDateKey]
                                                                              options:NSDirectoryEnumerationSkipsHiddenFiles
@@ -44,6 +51,7 @@
     NSString *decoded = [KTLKRCDecoder decodeData:data error:error];
     if (!decoded) return nil;
     NSArray *lines = [KTLKRCParser parseString:decoded];
+    NSArray *karaokeLines = [KTLKRCParser parseKaraokeString:decoded];
     if (lines.count == 0) return nil;
 
     NSString *stem = fileURL.lastPathComponent.stringByDeletingPathExtension;
@@ -55,7 +63,18 @@
     result.artist = artistSeparator.location == NSNotFound ? @"" : [stem substringToIndex:artistSeparator.location];
     result.title = artistSeparator.location == NSNotFound ? title : [stem substringFromIndex:NSMaxRange(artistSeparator)];
     result.lines = lines;
+    result.karaokeLines = karaokeLines;
     result.sourceURL = fileURL;
+    NSTimeInterval lastLyricEnd = 0;
+    for (NSDictionary<NSString *, id> *line in lines) {
+        NSTimeInterval end = [line[@"endTime"] respondsToSelector:@selector(doubleValue)]
+            ? [line[@"endTime"] doubleValue]
+            : [line[@"time"] doubleValue];
+        lastLyricEnd = MAX(lastLyricEnd, end);
+    }
+    result.lastLyricEnd = lastLyricEnd;
+    result.timingCompatible = [KTLLyricsTimingPolicy isLastLyricEndTime:lastLyricEnd
+                                             compatibleWithTrackDuration:duration];
     return result;
 }
 
