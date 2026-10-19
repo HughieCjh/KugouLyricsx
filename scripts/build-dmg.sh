@@ -2,7 +2,7 @@
 set -eu
 
 PROJECT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-VERSION="0.4.1"
+VERSION="0.4.2"
 APP_SOURCE="$PROJECT_DIR/build/KugouLyricsx.app"
 DIST_DIR="$PROJECT_DIR/dist"
 DMG_ROOT="$PROJECT_DIR/build/dmg-root"

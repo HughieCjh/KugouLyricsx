@@ -1,6 +1,6 @@
 SDK := $(shell xcrun --sdk macosx --show-sdk-path)
 CC := clang
-CFLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(CURDIR)/build/module-cache -Wall -Wextra -Werror -mmacosx-version-min=13.0 -isysroot $(SDK)
+CFLAGS := -fobjc-arc -fmodules -fmodules-cache-path=$(CURDIR)/build/module-cache -Wall -Wextra -Werror -arch x86_64 -arch arm64 -mmacosx-version-min=13.0 -isysroot $(SDK)
 CORE := Sources/Core/KTLLRCParser.m Sources/Core/KTLLyricTimeline.m Sources/Core/KTLTrack.m Sources/Core/KTLLyricsCache.m Sources/Core/KTLKeepAwakePolicy.m Sources/Core/KTLLyricsTimingPolicy.m Sources/Core/KTLLiveLyricDetector.m Sources/Core/KTLKaraokeTimeline.m Sources/Core/KTLAdaptiveTimingModel.m Sources/Core/KTLPlaybackStateResolver.m
 MEDIA := Sources/Media/KTLNowPlaying.m Sources/Media/KTLMediaRemoteClient.m Sources/Media/KTLMediaRemoteObserver.m Sources/Media/KTLKugouAccessibilityPositionProvider.m
 LYRICS := Sources/Lyrics/KTLKRCDecoder.m Sources/Lyrics/KTLKugouLocalLyricsProvider.m Sources/Lyrics/KTLRemoteLyricsService.m

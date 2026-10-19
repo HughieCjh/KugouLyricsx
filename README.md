@@ -29,18 +29,18 @@ KugouLyricsx 是一个针对酷狗音乐独立开发的 macOS 工具，不是 Ly
 ## 系统要求
 
 - **macOS 13 Ventura 或更高版本**。低于 macOS 13 的系统不能运行当前版本。
-- **Apple 芯片（arm64）Mac**。当前发布包及随附的媒体控制组件均为 arm64，不支持 Intel Mac。
+- **Apple 芯片（arm64）或 Intel（x86_64）Mac**。当前发布包的主程序和随附媒体控制组件均包含两种架构。
 - **实体 Touch Bar**。没有 Touch Bar 的 Mac 可以启动菜单栏程序，但无法使用本项目的核心歌词与控制界面。
 - **酷狗音乐 Mac 版**，并且酷狗需要能够向 macOS 发布“正在播放”信息。
 - 在线搜索歌词时需要网络；已缓存的酷狗本地歌词不需要网络。
 
 目前真实测试环境：MacBook Pro（M2，Mac14,7）、macOS 15.6.1、酷狗音乐 3.3.2。
 
-其他 Apple 芯片 Touch Bar 机型及较新的 macOS 版本理论上可以运行，但尚未逐一进行真机测试。Touch Bar 使用了系统私有接口，未来的 macOS 更新可能改变其行为。
+Intel Touch Bar Mac 尚未进行真机测试。其他 Touch Bar 机型及较新的 macOS 版本也尚未逐一测试。Touch Bar 使用了系统私有接口，未来的 macOS 更新可能改变其行为。
 
 ## 安装
 
-1. 打开 `KugouLyricsx-0.4.1.dmg`。
+1. 打开 `KugouLyricsx-0.4.2.dmg`。
 2. 将 `KugouLyricsx` 拖入“应用程序”。
 3. 启动酷狗音乐并播放歌曲，再打开本应用。
 
@@ -112,8 +112,8 @@ make release
 生成文件：
 
 - `dist/KugouLyricsx.app`
-- `dist/KugouLyricsx-0.4.1.dmg`
-- `dist/KugouLyricsx-0.4.1-app.zip`（适合放在 GitHub Release）
+- `dist/KugouLyricsx-0.4.2.dmg`
+- `dist/KugouLyricsx-0.4.2-app.zip`（适合放在 GitHub Release）
 
 运行核心逻辑测试：
 
@@ -128,6 +128,11 @@ make test
 应用只在本机读取系统“正在播放”信息、酷狗本地歌词缓存，以及在获得辅助功能授权后读取酷狗公开的当前播放时间标签。它不会读取键盘输入、控制酷狗界面或检查其他应用。找不到本地歌词时，才会把歌曲名和歌手名发送给 `music.163.com` 与 `lrclib.net` 搜索歌词。应用不收集账户、播放历史或个人资料。
 
 播放控制通过随应用打包的 `media-control` 工具发送给 macOS 当前媒体会话。第三方组件的许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## v0.4.2 更新内容
+
+- 主程序与媒体控制组件改为 Intel（x86_64）和 Apple 芯片（arm64）通用构建。
+- Intel 架构已通过构建与二进制检查，尚待 Intel Touch Bar Mac 真机验证。
 
 ## v0.4.1 更新内容
 
@@ -182,7 +187,7 @@ make test
 - 逐字高亮依赖酷狗本地 KRC 中的逐字标签；没有标签或无法匹配实时文字时会退回整句显示。
 - 自适应速度要在一句歌词真实播放结束后才能得到样本，因此第一次出现仍可能略快或略慢；重复段落会逐渐稳定。
 - 目前只在一台 Touch Bar Mac 和酷狗音乐 3.3.2 上完成真实播放验证；没有 Touch Bar UI 自动化测试。
-- 当前打包的媒体控制组件只有 arm64 版本，因此此发布包不支持 Intel Mac。
+- Intel Touch Bar Mac 尚未完成真实播放验证。
 
 ## 项目结构
 
