@@ -138,7 +138,7 @@
     NSArray<NSDictionary<NSString *, id> *> *segments = line[@"segments"];
     if (relativeTime < 0) return @{ @"completedLength": @0, @"characterFraction": @0 };
     if (segments.count == 0) {
-        return @{ @"completedLength": @(text.length), @"characterFraction": @0 };
+        return @{ @"completedLength": @0, @"characterFraction": @0 };
     }
 
     NSUInteger completed = 0;

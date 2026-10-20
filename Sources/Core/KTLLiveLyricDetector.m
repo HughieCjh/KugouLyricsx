@@ -26,6 +26,7 @@
 - (void)resetWithKnownLines:(NSArray<NSDictionary<NSString *, id> *> *)lines {
     NSMutableArray<NSString *> *known = [NSMutableArray array];
     for (NSDictionary<NSString *, id> *line in lines) {
+        if ([line[@"metadata"] boolValue]) continue;
         NSString *text = [line[@"text"] isKindOfClass:NSString.class] ? line[@"text"] : @"";
         NSString *normalized = [KTLLiveLyricDetector normalizedText:text];
         if (normalized.length >= 2) [known addObject:normalized];

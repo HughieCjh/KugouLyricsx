@@ -8,6 +8,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, copy) NSString *album;
 @property(nonatomic, copy) NSString *bundleIdentifier;
 @property(nonatomic, copy) NSString *appName;
+@property(nonatomic, copy) NSString *contentItemIdentifier;
 @property(nonatomic, assign) NSTimeInterval duration;
 @property(nonatomic, assign) NSTimeInterval elapsed;
 @property(nonatomic, readonly) BOOL hasElapsed;

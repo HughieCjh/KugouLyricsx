@@ -102,9 +102,8 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
                            handler:^(KTLNowPlaying *state) {
         if (state.isKugou) [weakSelf applyObservedSnapshot:state];
     }];
-    NSString *lyricsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Containers/com.kugou.mac.Music/Data/Documents/Caches/kgLyric"];
     self.localLyricsProvider = [[KTLKugouLocalLyricsProvider alloc]
-        initWithLyricsDirectory:[NSURL fileURLWithPath:lyricsPath]];
+        initWithLyricsDirectories:[KTLKugouLocalLyricsProvider defaultLyricsDirectories]];
     self.remoteLyricsService = [KTLRemoteLyricsService new];
 
     self.touchBarController = [KTLTouchBarController new];
@@ -296,6 +295,7 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
         self.lastLiveLyricText = @"";
         NSError *error = nil;
         self.localLyricsCandidate = [self.localLyricsProvider lyricsForTitle:state.title
+                                                                      artist:state.artist
                                                                     duration:state.duration
                                                                        error:&error];
         if (self.localLyricsCandidate.karaokeLines.count > 0) {
@@ -351,6 +351,9 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
 }
 
 - (NSString *)trackKeyForState:(KTLNowPlaying *)state {
+    if (state.contentItemIdentifier.length > 0) {
+        return [NSString stringWithFormat:@"id:%@", state.contentItemIdentifier];
+    }
     return [NSString stringWithFormat:@"%@|%.1f", state.title, state.duration];
 }
 
@@ -391,7 +394,10 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
     if ([self.fetchingTrackKey isEqual:requestedTrackKey]) return;
     self.fetchingTrackKey = requestedTrackKey;
     __weak typeof(self) weakSelf = self;
-    [self.remoteLyricsService fetchLyricsForTitle:state.title duration:state.duration completion:^(KTLRemoteLyricsResult *result) {
+    [self.remoteLyricsService fetchLyricsForTitle:state.title
+                                           artist:state.artist
+                                         duration:state.duration
+                                       completion:^(KTLRemoteLyricsResult *result) {
         typeof(self) self = weakSelf;
         if (!self || ![self.activeTrackKey isEqual:requestedTrackKey]) return;
         self.fetchingTrackKey = @"";
@@ -564,7 +570,7 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
         [self updateDualSideForPresentationKey:presentationKey];
         NSUInteger completedLength = highlight
             ? [highlight[@"completedLength"] unsignedIntegerValue]
-            : text.length;
+            : 0;
         CGFloat characterFraction = highlight
             ? [highlight[@"characterFraction"] doubleValue]
             : 0;

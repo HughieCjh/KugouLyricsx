@@ -12,6 +12,7 @@ typedef void (^KTLRemoteLyricsCompletion)(KTLRemoteLyricsResult * _Nullable resu
 
 @interface KTLRemoteLyricsService : NSObject
 - (void)fetchLyricsForTitle:(NSString *)title
+                     artist:(NSString *)artist
                    duration:(NSTimeInterval)duration
                  completion:(KTLRemoteLyricsCompletion)completion;
 @end

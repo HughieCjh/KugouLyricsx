@@ -30,6 +30,7 @@ function run() {
         playbackRate: get('kMRMediaRemoteNowPlayingInfoPlaybackRate'),
         playing: unwrap(request.localIsPlaying),
         bundleIdentifier: unwrap(client.bundleIdentifier),
-        appName: unwrap(client.displayName)
+        appName: unwrap(client.displayName),
+        contentItemIdentifier: get('kMRMediaRemoteNowPlayingInfoContentItemIdentifier')
     });
 }

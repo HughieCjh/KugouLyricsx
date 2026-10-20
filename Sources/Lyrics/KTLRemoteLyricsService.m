@@ -6,14 +6,37 @@
 
 @implementation KTLRemoteLyricsService
 
++ (NSString *)normalizedIdentity:(NSString *)value {
+    NSMutableCharacterSet *allowed = [NSCharacterSet.letterCharacterSet mutableCopy];
+    [allowed formUnionWithCharacterSet:NSCharacterSet.decimalDigitCharacterSet];
+    NSArray *parts = [value.lowercaseString componentsSeparatedByCharactersInSet:allowed.invertedSet];
+    return [parts componentsJoinedByString:@""];
+}
+
++ (BOOL)artist:(NSString *)candidate matches:(NSString *)expected {
+    NSString *wanted = [self normalizedIdentity:expected];
+    if (wanted.length == 0) return YES;
+    NSString *found = [self normalizedIdentity:candidate];
+    return found.length > 0 && (NSOrderedSame == [found compare:wanted] ||
+        (wanted.length >= 3 && [found containsString:wanted]));
+}
+
 + (NSDictionary *)bestNeteaseSongFromItems:(NSArray<NSDictionary *> *)items
                                       title:(NSString *)title
+                                     artist:(NSString *)artist
                                    duration:(NSTimeInterval)duration {
     NSDictionary *best = nil;
     NSTimeInterval bestDifference = DBL_MAX;
     for (NSDictionary *song in items) {
         NSString *name = [song[@"name"] isKindOfClass:NSString.class] ? song[@"name"] : @"";
         if ([name localizedCaseInsensitiveCompare:title] != NSOrderedSame) continue;
+        NSArray *artists = [song[@"artists"] isKindOfClass:NSArray.class] ? song[@"artists"] : song[@"ar"];
+        BOOL artistMatches = artist.length == 0;
+        for (NSDictionary *entry in artists) {
+            NSString *name = [entry[@"name"] isKindOfClass:NSString.class] ? entry[@"name"] : @"";
+            if ([self artist:name matches:artist]) { artistMatches = YES; break; }
+        }
+        if (!artistMatches) continue;
         if (duration <= 0) return song;
 
         id rawDuration = song[@"duration"] ?: song[@"dt"];
@@ -30,11 +53,12 @@
 }
 
 - (void)fetchLyricsForTitle:(NSString *)title
+                     artist:(NSString *)artist
                    duration:(NSTimeInterval)duration
                  completion:(KTLRemoteLyricsCompletion)completion {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        KTLRemoteLyricsResult *result = [self fetchNeteaseTitle:title duration:duration];
-        if (!result) result = [self fetchLRCLIBTitle:title duration:duration];
+        KTLRemoteLyricsResult *result = [self fetchNeteaseTitle:title artist:artist duration:duration];
+        if (!result) result = [self fetchLRCLIBTitle:title artist:artist duration:duration];
         dispatch_async(dispatch_get_main_queue(), ^{ completion(result); });
     });
 }
@@ -42,7 +66,7 @@
 - (nullable id)JSONForURL:(NSURL *)URL {
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:URL];
     request.timeoutInterval = 8;
-    [request setValue:@"Mozilla/5.0 KugouLyricsx/0.4.1" forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"Mozilla/5.0 KugouLyricsx/0.4.3" forHTTPHeaderField:@"User-Agent"];
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
     __block NSData *responseData = nil;
     NSURLSessionDataTask *task = [NSURLSession.sharedSession dataTaskWithRequest:request
@@ -65,8 +89,9 @@
     return [value stringByAddingPercentEncodingWithAllowedCharacters:allowed] ?: @"";
 }
 
-- (KTLRemoteLyricsResult *)fetchNeteaseTitle:(NSString *)title duration:(NSTimeInterval)duration {
-    (void)duration;
+- (KTLRemoteLyricsResult *)fetchNeteaseTitle:(NSString *)title
+                                     artist:(NSString *)artist
+                                   duration:(NSTimeInterval)duration {
     NSString *URLString = [NSString stringWithFormat:
         @"https://music.163.com/api/search/get/web?csrf_token=&s=%@&type=1&offset=0&total=true&limit=8",
         [self escaped:title]];
@@ -74,6 +99,7 @@
     NSArray *songs = [search[@"result"][@"songs"] isKindOfClass:NSArray.class] ? search[@"result"][@"songs"] : nil;
     NSDictionary *selected = [KTLRemoteLyricsService bestNeteaseSongFromItems:songs
                                                                         title:title
+                                                                       artist:artist
                                                                      duration:duration];
     NSNumber *songID = selected[@"id"];
     if (!songID) return nil;
@@ -85,15 +111,18 @@
     if (lines.count == 0) return nil;
 
     NSArray *artists = [selected[@"artists"] isKindOfClass:NSArray.class] ? selected[@"artists"] : @[];
-    NSString *artist = [artists.firstObject[@"name"] isKindOfClass:NSString.class] ? artists.firstObject[@"name"] : @"";
+    NSString *selectedArtist = [artists.firstObject[@"name"] isKindOfClass:NSString.class]
+        ? artists.firstObject[@"name"] : @"";
     KTLRemoteLyricsResult *result = [KTLRemoteLyricsResult new];
-    result.artist = artist;
+    result.artist = selectedArtist;
     result.sourceName = @"网易云音乐";
     result.lines = lines;
     return result;
 }
 
-- (KTLRemoteLyricsResult *)fetchLRCLIBTitle:(NSString *)title duration:(NSTimeInterval)duration {
+- (KTLRemoteLyricsResult *)fetchLRCLIBTitle:(NSString *)title
+                                    artist:(NSString *)artist
+                                  duration:(NSTimeInterval)duration {
     NSString *URLString = [NSString stringWithFormat:@"https://lrclib.net/api/search?track_name=%@", [self escaped:title]];
     NSArray *items = [self JSONForURL:[NSURL URLWithString:URLString]];
     if (![items isKindOfClass:NSArray.class]) return nil;
@@ -104,8 +133,9 @@
         NSString *synced = [item[@"syncedLyrics"] isKindOfClass:NSString.class] ? item[@"syncedLyrics"] : @"";
         if (synced.length == 0) continue;
         NSString *name = [item[@"trackName"] isKindOfClass:NSString.class] ? item[@"trackName"] : @"";
-        if ([name rangeOfString:title options:NSCaseInsensitiveSearch].location == NSNotFound &&
-            [title rangeOfString:name options:NSCaseInsensitiveSearch].location == NSNotFound) continue;
+        if ([name localizedCaseInsensitiveCompare:title] != NSOrderedSame) continue;
+        NSString *candidateArtist = [item[@"artistName"] isKindOfClass:NSString.class] ? item[@"artistName"] : @"";
+        if (![KTLRemoteLyricsService artist:candidateArtist matches:artist]) continue;
         NSTimeInterval difference = duration > 0 ? fabs([item[@"duration"] doubleValue] - duration) : 0;
         if (difference < bestDifference) { best = item; bestDifference = difference; }
     }

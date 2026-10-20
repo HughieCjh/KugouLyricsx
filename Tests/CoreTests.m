@@ -26,6 +26,7 @@ static void Assert(BOOL condition, NSString *message) {
 @interface KTLRemoteLyricsService (Testing)
 + (nullable NSDictionary *)bestNeteaseSongFromItems:(NSArray<NSDictionary *> *)items
                                                title:(NSString *)title
+                                              artist:(NSString *)artist
                                             duration:(NSTimeInterval)duration;
 @end
 
@@ -98,6 +99,13 @@ int main(void) {
         [knownLyricDetector observeMediaText:@""];
         Assert([knownLyricDetector.currentLyric isEqual:@""],
                @"blank live text should create a blank instrumental interval");
+        [knownLyricDetector resetWithKnownLines:@[
+            @{ @"text": @"测试歌手", @"metadata": @YES },
+            @{ @"text": @"真正的唱词", @"metadata": @NO }
+        ]];
+        [knownLyricDetector observeMediaText:@"测试歌手"];
+        Assert(!knownLyricDetector.active,
+               @"an artist in KRC credits must not be mistaken for live lyrics");
 
         KTLLiveLyricDetector *stableArtistDetector = [KTLLiveLyricDetector new];
         [stableArtistDetector resetWithKnownLines:@[]];
@@ -114,18 +122,24 @@ int main(void) {
         [changingTextDetector observeMediaText:@"第三条动态文本"];
         Assert(changingTextDetector.active, @"repeated media text changes should activate live lyrics");
 
-        NSDictionary *shortVersion = @{ @"id": @1, @"name": @"你", @"duration": @168079 };
-        NSDictionary *matchingVersion = @{ @"id": @2, @"name": @"你", @"duration": @282500 };
+        NSDictionary *shortVersion = @{ @"id": @1, @"name": @"你", @"duration": @168079,
+            @"artists": @[ @{ @"name": @"其他歌手" } ] };
+        NSDictionary *matchingVersion = @{ @"id": @2, @"name": @"你", @"duration": @282500,
+            @"artists": @[ @{ @"name": @"目标歌手" } ] };
+        NSDictionary *wrongArtistVersion = @{ @"id": @3, @"name": @"你", @"duration": @282600,
+            @"artists": @[ @{ @"name": @"其他歌手" } ] };
         NSDictionary *selectedVersion = [KTLRemoteLyricsService bestNeteaseSongFromItems:@[
             shortVersion,
-            matchingVersion
-        ] title:@"你" duration:282.754];
+            matchingVersion,
+            wrongArtistVersion
+        ] title:@"你" artist:@"目标歌手" duration:282.754];
         Assert([selectedVersion[@"id"] isEqual:@2],
-               @"remote fallback should choose the same-duration version of a same-title song");
+               @"remote fallback should match both artist and duration of a same-title song");
         Assert([KTLRemoteLyricsService bestNeteaseSongFromItems:@[shortVersion]
                                                            title:@"你"
+                                                          artist:@"目标歌手"
                                                         duration:282.754] == nil,
-               @"remote fallback should reject a severely mismatched same-title version");
+               @"remote fallback should reject a different artist");
 
         KTLTrack *track = [[KTLTrack alloc] initWithTitle:@"夜曲（Live）" artist:@"周杰伦" duration:226.4];
         Assert([track.normalizedTitle isEqual:@"夜曲"], @"title suffix should be removed");
@@ -159,6 +173,21 @@ int main(void) {
         }];
         Assert(fabs(mediaControlState.elapsed - 23.75) < 0.001,
                @"live media-control elapsedTimeNow should take precedence");
+        KTLNowPlaying *identifiedState = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"同名歌曲", @"duration": @200, @"elapsed": @80,
+            @"contentItemIdentifier": @"song-b"
+        }];
+        KTLNowPlaying *previousIdentifiedState = [KTLNowPlaying nowPlayingFromDictionary:@{
+            @"title": @"同名歌曲", @"duration": @200, @"elapsed": @20,
+            @"contentItemIdentifier": @"song-a"
+        }];
+        Assert([identifiedState.contentItemIdentifier isEqual:@"song-b"],
+               @"media item identifier should be retained for track changes");
+        Assert([KTLNowPlaying foregroundSafeObservedState:identifiedState
+                                            currentState:previousIdentifiedState
+                                       estimatedElapsed:20] == identifiedState &&
+               fabs(identifiedState.elapsed - 80) < 0.001,
+               @"a same-title new item must not inherit the previous song's clock");
 
         KTLNowPlaying *mediaControlFallbackState = [KTLNowPlaying nowPlayingFromDictionary:@{
             @"title": @"你",
@@ -389,6 +418,37 @@ int main(void) {
         NSString *krcText = @"[0,1000]<0,500,0>你<500,500,0>好\n[1000,1000]<0,1000,0>世界";
         NSString *decodedKRC = [KTLKRCDecoder decodeData:EncodeKRCForTest(krcText) error:&error];
         Assert([decodedKRC isEqual:krcText], @"KRC should decrypt and inflate");
+        NSURL *lyricsRoot = [NSURL fileURLWithPath:[NSTemporaryDirectory()
+            stringByAppendingPathComponent:NSUUID.UUID.UUIDString]];
+        NSURL *newLyricsDirectory = [lyricsRoot URLByAppendingPathComponent:@"new"];
+        NSURL *oldLyricsDirectory = [lyricsRoot URLByAppendingPathComponent:@"old"];
+        [NSFileManager.defaultManager createDirectoryAtURL:newLyricsDirectory
+                               withIntermediateDirectories:YES attributes:nil error:nil];
+        [NSFileManager.defaultManager createDirectoryAtURL:oldLyricsDirectory
+                               withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *shortKRC = @"[1000,1000]<0,1000,0>短版歌词";
+        NSString *matchingKRC = @"[1000,1000]<0,1000,0>正确歌词\n[175000,5000]<0,5000,0>结尾";
+        [EncodeKRCForTest(shortKRC) writeToURL:
+            [newLyricsDirectory URLByAppendingPathComponent:@"其他歌手 - 同名歌曲_a.krc"]
+                                     atomically:YES];
+        [EncodeKRCForTest(shortKRC) writeToURL:
+            [oldLyricsDirectory URLByAppendingPathComponent:@"目标歌手 - 同名歌曲_old.krc"]
+                                     atomically:YES];
+        [EncodeKRCForTest(matchingKRC) writeToURL:
+            [newLyricsDirectory URLByAppendingPathComponent:@"目标歌手 - 同名歌曲_new.krc"]
+                                        atomically:YES];
+        KTLKugouLocalLyricsProvider *provider = [[KTLKugouLocalLyricsProvider alloc]
+            initWithLyricsDirectories:@[newLyricsDirectory, oldLyricsDirectory]];
+        KTLKugouLocalLyricsResult *matchingLocal = [provider lyricsForTitle:@"同名歌曲"
+                                                                   artist:@"目标歌手"
+                                                                 duration:190 error:nil];
+        Assert([matchingLocal.lines.firstObject[@"text"] isEqual:@"正确歌词"] &&
+               matchingLocal.timingCompatible,
+               @"new Kugou cache should select the matching artist and closest timed KRC");
+        Assert([provider lyricsForTitle:@"同名歌曲" artist:@"未知歌手"
+                               duration:190 error:nil] == nil,
+               @"local cache must not use another artist's same-title lyric");
+        [NSFileManager.defaultManager removeItemAtURL:lyricsRoot error:nil];
         NSArray *krcLines = [KTLKRCParser parseString:decodedKRC];
         Assert(krcLines.count == 2, @"KRC lines should parse");
         Assert([krcLines[0][@"text"] isEqual:@"你好"], @"KRC word timing tags should be removed");
@@ -528,6 +588,10 @@ int main(void) {
         NSDictionary *finishedProgress = [KTLKaraokeTimeline highlightForLine:progressLine relativeTime:3.0];
         Assert([finishedProgress[@"completedLength"] unsignedIntegerValue] == 2,
                @"karaoke highlight should finish the whole lyric after its duration");
+        NSDictionary *untimedProgress = [KTLKaraokeTimeline highlightForLine:
+            @{ @"text": @"普通 LRC 歌词" } relativeTime:3.0];
+        Assert([untimedProgress[@"completedLength"] unsignedIntegerValue] == 0,
+               @"lyrics without word timing must not stay fully blue");
 
         NSArray *adaptiveLines = [KTLKRCParser parseKaraokeString:
             @"[0,2000]<0,1000,0>甲<1000,1000,0>乙\n[2000,1000]<0,1000,0>下一句"];

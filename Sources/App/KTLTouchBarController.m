@@ -222,7 +222,7 @@ typedef NS_ENUM(NSUInteger, KTLMediaIcon) {
 
 - (void)updateLyric:(NSString *)lyric playing:(BOOL)playing {
     NSString *value = lyric ?: @"";
-    [self updateLyric:value completedLength:value.length characterFraction:0 playing:playing];
+    [self updateLyric:value completedLength:0 characterFraction:0 playing:playing];
 }
 
 - (void)updateLyric:(NSString *)lyric

@@ -22,10 +22,10 @@ int main(int argc, const char *argv[]) {
             return 2;
         }
         NSMutableDictionary *report = [state.dictionaryRepresentation mutableCopy];
-        NSString *lyricsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Containers/com.kugou.mac.Music/Data/Documents/Caches/kgLyric"];
         KTLKugouLocalLyricsProvider *provider = [[KTLKugouLocalLyricsProvider alloc]
-            initWithLyricsDirectory:[NSURL fileURLWithPath:lyricsPath]];
+            initWithLyricsDirectories:[KTLKugouLocalLyricsProvider defaultLyricsDirectories]];
         KTLKugouLocalLyricsResult *lyrics = [provider lyricsForTitle:state.title
+                                                              artist:state.artist
                                                            duration:state.duration
                                                               error:nil];
         if (lyrics) {

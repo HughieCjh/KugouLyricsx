@@ -14,9 +14,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 
 @interface KTLKugouLocalLyricsProvider : NSObject
++ (NSArray<NSURL *> *)defaultLyricsDirectories;
 - (instancetype)initWithLyricsDirectory:(NSURL *)lyricsDirectory;
+- (instancetype)initWithLyricsDirectories:(NSArray<NSURL *> *)lyricsDirectories;
 - (nullable KTLKugouLocalLyricsResult *)lyricsForTitle:(NSString *)title error:(NSError **)error;
 - (nullable KTLKugouLocalLyricsResult *)lyricsForTitle:(NSString *)title
+                                              duration:(NSTimeInterval)duration
+                                                 error:(NSError **)error;
+- (nullable KTLKugouLocalLyricsResult *)lyricsForTitle:(NSString *)title
+                                                artist:(NSString *)artist
                                               duration:(NSTimeInterval)duration
                                                  error:(NSError **)error;
 @end

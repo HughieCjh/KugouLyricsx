@@ -33,6 +33,8 @@
     state.album = [dictionary[@"album"] isKindOfClass:NSString.class] ? dictionary[@"album"] : @"";
     state.bundleIdentifier = [dictionary[@"bundleIdentifier"] isKindOfClass:NSString.class] ? dictionary[@"bundleIdentifier"] : @"";
     state.appName = [dictionary[@"appName"] isKindOfClass:NSString.class] ? dictionary[@"appName"] : @"";
+    state.contentItemIdentifier = [dictionary[@"contentItemIdentifier"] isKindOfClass:NSString.class]
+        ? dictionary[@"contentItemIdentifier"] : @"";
     state.duration = [self safeDoubleFromValue:dictionary[@"duration"]];
     double elapsed = 0;
     state.hasElapsed = [self firstDoubleFromDictionary:dictionary
@@ -53,11 +55,17 @@
     if (!positionSource || !positionSource.hasElapsed) return primary;
 
     BOOL sameTitle = [primary.title isEqualToString:positionSource.title];
+    BOOL sameItem = primary.contentItemIdentifier.length == 0 ||
+        positionSource.contentItemIdentifier.length == 0 ||
+        [primary.contentItemIdentifier isEqualToString:positionSource.contentItemIdentifier];
     BOOL compatibleDuration = primary.duration <= 0 || positionSource.duration <= 0 ||
         fabs(primary.duration - positionSource.duration) < 4.0;
-    if (sameTitle && compatibleDuration) {
+    if (sameTitle && sameItem && compatibleDuration) {
         primary.elapsed = MAX(0, positionSource.elapsed);
         primary.hasElapsed = YES;
+    }
+    if (primary.contentItemIdentifier.length == 0) {
+        primary.contentItemIdentifier = positionSource.contentItemIdentifier;
     }
     return primary;
 }
@@ -66,7 +74,9 @@
                                  currentState:(KTLNowPlaying *)currentState
                              estimatedElapsed:(NSTimeInterval)estimatedElapsed {
     if (!observed || !currentState ||
-        ![observed.title isEqualToString:currentState.title]) return observed;
+        ![observed.title isEqualToString:currentState.title] ||
+        (observed.contentItemIdentifier.length > 0 && currentState.contentItemIdentifier.length > 0 &&
+         ![observed.contentItemIdentifier isEqualToString:currentState.contentItemIdentifier])) return observed;
 
     if (observed.duration <= 0 && currentState.duration > 0) {
         observed.duration = currentState.duration;
@@ -75,6 +85,9 @@
         observed.bundleIdentifier = currentState.bundleIdentifier;
     }
     if (observed.appName.length == 0) observed.appName = currentState.appName;
+    if (observed.contentItemIdentifier.length == 0) {
+        observed.contentItemIdentifier = currentState.contentItemIdentifier;
+    }
 
     BOOL staleClock = !observed.hasElapsed || !isfinite(observed.elapsed) ||
         fabs(observed.elapsed - estimatedElapsed) > 1.25;
@@ -111,6 +124,7 @@
         @"playbackRate": @(self.playbackRate),
         @"bundleIdentifier": self.bundleIdentifier ?: @"",
         @"appName": self.appName ?: @"",
+        @"contentItemIdentifier": self.contentItemIdentifier ?: @"",
         @"isKugou": @(self.isKugou)
     };
 }
