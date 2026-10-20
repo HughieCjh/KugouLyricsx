@@ -64,6 +64,12 @@ int main(void) {
         ]];
         Assert([timedTimeline lineAtTime:1.5] != nil, @"timed KRC line should display during its duration");
         Assert([timedTimeline lineAtTime:3.0] == nil, @"instrumental gap should not retain the previous lyric");
+        Assert([[[timedTimeline mostRecentLineAtTime:3.0 excludingMetadata:YES]
+            objectForKey:@"text"] isEqual:@"第一句"],
+               @"display should retain the completed lyric until the next one starts");
+        Assert([[[timedTimeline mostRecentLineAtTime:6.5 excludingMetadata:YES]
+            objectForKey:@"text"] isEqual:@"第二句"],
+               @"display should retain the final completed lyric");
         Assert([timedTimeline lineAtTime:5.5] != nil, @"next timed line should display at its own start");
         Assert([[[timedTimeline nextLineAfterTime:3.0 excludingMetadata:YES]
             objectForKey:@"text"] isEqual:@"第二句"],
@@ -77,6 +83,9 @@ int main(void) {
         Assert([[[metadataGapTimeline nextLineAfterTime:2.5 excludingMetadata:YES]
             objectForKey:@"text"] isEqual:@"下一句"],
                @"foreground lyric preloading must skip production credits between sung lines");
+        Assert([[[metadataGapTimeline mostRecentLineAtTime:3.25 excludingMetadata:YES]
+            objectForKey:@"text"] isEqual:@"唱词"],
+               @"production credits should not replace a held lyric");
 
         Assert(![KTLLyricsTimingPolicy isLastLyricEndTime:168.079
                                      compatibleWithTrackDuration:282.754],

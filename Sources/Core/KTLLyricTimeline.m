@@ -29,6 +29,23 @@
     return line;
 }
 
+- (NSDictionary<NSString *, id> *)mostRecentLineAtTime:(NSTimeInterval)time
+                                      excludingMetadata:(BOOL)excludingMetadata {
+    if (self.lines.count == 0 || time < [self.lines[0][@"time"] doubleValue]) return nil;
+    NSUInteger lower = 0;
+    NSUInteger upper = self.lines.count;
+    while (lower < upper) {
+        NSUInteger middle = lower + (upper - lower) / 2;
+        if ([self.lines[middle][@"time"] doubleValue] <= time) lower = middle + 1;
+        else upper = middle;
+    }
+    while (lower > 0) {
+        NSDictionary<NSString *, id> *line = self.lines[--lower];
+        if (!excludingMetadata || ![line[@"metadata"] boolValue]) return line;
+    }
+    return nil;
+}
+
 - (NSDictionary<NSString *, id> *)nextLineAfterTime:(NSTimeInterval)time
                                     excludingMetadata:(BOOL)excludingMetadata {
     NSUInteger lower = 0;

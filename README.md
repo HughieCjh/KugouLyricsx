@@ -40,7 +40,7 @@ Intel Touch Bar Mac 尚未进行真机测试。其他 Touch Bar 机型及较新�
 
 ## 安装
 
-1. 打开 `KugouLyricsx-0.4.3.dmg`。
+1. 打开 `KugouLyricsx-0.4.4.dmg`。
 2. 将 `KugouLyricsx` 拖入“应用程序”。
 3. 启动酷狗音乐并播放歌曲，再打开本应用。
 
@@ -112,8 +112,8 @@ make release
 生成文件：
 
 - `dist/KugouLyricsx.app`
-- `dist/KugouLyricsx-0.4.3.dmg`
-- `dist/KugouLyricsx-0.4.3-app.zip`（适合放在 GitHub Release）
+- `dist/KugouLyricsx-0.4.4.dmg`
+- `dist/KugouLyricsx-0.4.4-app.zip`（适合放在 GitHub Release）
 
 运行核心逻辑测试：
 
@@ -128,6 +128,11 @@ make test
 应用只在本机读取系统“正在播放”信息、酷狗本地歌词缓存，以及在获得辅助功能授权后读取酷狗公开的当前播放时间标签。它不会读取键盘输入、控制酷狗界面或检查其他应用。找不到本地歌词时，才会把歌曲名和歌手名发送给 `music.163.com` 与 `lrclib.net` 搜索歌词。应用不收集账户、播放历史或个人资料。
 
 播放控制通过随应用打包的 `media-control` 工具发送给 macOS 当前媒体会话。第三方组件的许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## v0.4.4 更新内容
+
+- 一句歌词唱完后保持显示与完整高亮，直到下一句开始。
+- 切换到其他应用时继续使用匹配的本地逐字歌词，避免歌词消失。
 
 ## v0.4.3 更新内容
 

@@ -273,6 +273,9 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
     NSString *trackKey = [self trackKeyForState:state];
     BOOL trackChanged = ![self.activeTrackKey isEqual:trackKey];
     NSTimeInterval previousElapsed = [self estimatedElapsed];
+    if (!trackChanged && !state.hasElapsed && self.nowPlaying.hasElapsed) {
+        [state applyConfirmedElapsed:previousElapsed];
+    }
     BOOL seeked = !trackChanged && self.nowPlaying && state.hasElapsed &&
         fabs(state.elapsed - previousElapsed) > 1.25;
     if (trackChanged || seeked) [self.playbackStateResolver reset];
@@ -442,15 +445,19 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
     NSDictionary<NSString *, id> *currentPresentation = nil;
     NSTimeInterval renderedRelativeTime = 0;
     BOOL hasRenderedRelativeTime = NO;
-    BOOL useForegroundTimeline = self.kugouIsFrontmost &&
-        self.localLyricsCandidate.timingCompatible && self.karaokeTimeline != nil;
-    if (useForegroundTimeline) {
+    BOOL useLocalTimeline = self.localLyricsCandidate.timingCompatible &&
+        self.karaokeTimeline != nil && self.nowPlaying.hasElapsed;
+    if (useLocalTimeline) {
         NSTimeInterval playbackTime = elapsed + self.lyricOffset;
         NSDictionary *line = [self.karaokeTimeline lineAtTime:playbackTime];
         BOOL metadata = [line[@"metadata"] boolValue];
         if (!line || (metadata && self.hasShownRealLiveLyric)) {
-            line = [self.karaokeTimeline nextLineAfterTime:playbackTime
-                                          excludingMetadata:YES];
+            line = [self.karaokeTimeline mostRecentLineAtTime:playbackTime
+                                            excludingMetadata:YES];
+            if (!line && !self.hasShownRealLiveLyric) {
+                line = [self.karaokeTimeline nextLineAfterTime:playbackTime
+                                              excludingMetadata:YES];
+            }
             metadata = NO;
         }
         if (metadata) {
@@ -540,6 +547,10 @@ static BOOL KTLApplicationIsKugou(NSRunningApplication *application) {
         }
     } else if (self.timeline) {
         NSDictionary *line = [self.timeline lineAtTime:elapsed + self.lyricOffset];
+        if (!line || [line[@"metadata"] boolValue]) {
+            line = [self.timeline mostRecentLineAtTime:elapsed + self.lyricOffset
+                                     excludingMetadata:YES];
+        }
         text = line[@"text"] ?: @"";
         if (line) {
             currentPresentation = line;
